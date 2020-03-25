@@ -409,7 +409,7 @@ static void init_session(void)
 {
     unsigned int i;
 
-    for(i=0; i < sizeof(object_creation)/sizeof(object_creation[0]); i++) {
+    for(i = 0; i < ARRAY_SIZE(object_creation); i++) {
         if(object_creation[i].protocol)
             register_namespace(object_creation[i].cf, object_creation[i].clsid,
                                       object_creation[i].protocol, TRUE);
@@ -438,10 +438,10 @@ HRESULT WINAPI DllGetClassObject(REFCLSID rclsid, REFIID riid, LPVOID *ppv)
 {
     unsigned int i;
     HRESULT hr;
-    
+
     TRACE("(%s,%s,%p)\n", debugstr_guid(rclsid), debugstr_guid(riid), ppv);
-    
-    for (i=0; i < sizeof(object_creation)/sizeof(object_creation[0]); i++)
+
+    for (i = 0; i < ARRAY_SIZE(object_creation); i++)
     {
 	if (IsEqualGUID(object_creation[i].clsid, rclsid))
 	    return IClassFactory_QueryInterface(object_creation[i].cf, riid, ppv);
@@ -608,7 +608,7 @@ HRESULT WINAPI CopyStgMedium(const STGMEDIUM *src, STGMEDIUM *dst)
         break;
     case TYMED_FILE:
         if(src->u.lpszFileName && !src->pUnkForRelease) {
-            DWORD size = (strlenW(src->u.lpszFileName)+1)*sizeof(WCHAR);
+            DWORD size = (lstrlenW(src->u.lpszFileName)+1)*sizeof(WCHAR);
             dst->u.lpszFileName = CoTaskMemAlloc(size);
             if(!dst->u.lpszFileName)
                 return E_OUTOFMEMORY;
@@ -674,7 +674,7 @@ HRESULT WINAPI CopyBindInfo(const BINDINFO *pcbiSrc, BINDINFO *pcbiDest)
 
     size = FIELD_OFFSET(BINDINFO, szExtraInfo)+sizeof(void*);
     if(pcbiSrc->cbSize>=size && pcbiDest->cbSize>=size && pcbiSrc->szExtraInfo) {
-        size = (strlenW(pcbiSrc->szExtraInfo)+1)*sizeof(WCHAR);
+        size = (lstrlenW(pcbiSrc->szExtraInfo)+1)*sizeof(WCHAR);
         pcbiDest->szExtraInfo = CoTaskMemAlloc(size);
         if(!pcbiDest->szExtraInfo)
             return E_OUTOFMEMORY;
@@ -692,7 +692,7 @@ HRESULT WINAPI CopyBindInfo(const BINDINFO *pcbiSrc, BINDINFO *pcbiDest)
 
     size = FIELD_OFFSET(BINDINFO, szCustomVerb)+sizeof(void*);
     if(pcbiSrc->cbSize>=size && pcbiDest->cbSize>=size && pcbiSrc->szCustomVerb) {
-        size = (strlenW(pcbiSrc->szCustomVerb)+1)*sizeof(WCHAR);
+        size = (lstrlenW(pcbiSrc->szCustomVerb)+1)*sizeof(WCHAR);
         pcbiDest->szCustomVerb = CoTaskMemAlloc(size);
         if(!pcbiDest->szCustomVerb) {
             CoTaskMemFree(pcbiDest->szExtraInfo);
@@ -811,6 +811,16 @@ int WINAPI MapBrowserEmulationModeToUserAgent(DWORD unk1, DWORD unk2)
 }
 
 /***********************************************************************
+ *           CoInternetGetBrowserProfile (URLMON.446)
+ *    Undocumented, added in IE8
+ */
+HRESULT WINAPI CoInternetGetBrowserProfile(DWORD unk)
+{
+    FIXME("%x: stub\n", unk);
+    return E_NOTIMPL;
+}
+
+/***********************************************************************
  *           FlushUrlmonZonesCache (URLMON.455)
  *    Undocumented, added in IE8
  */
@@ -827,4 +837,26 @@ HRESULT WINAPI RegisterMediaTypes(UINT types, LPCSTR *szTypes, CLIPFORMAT *cfTyp
 {
    FIXME("stub: %u %p %p\n", types, szTypes, cfTypes);
    return E_INVALIDARG;
+}
+
+/***********************************************************************
+ *            ShouldShowIntranetWarningSecband
+ *    Undocumented, added in IE7
+ */
+BOOL WINAPI ShouldShowIntranetWarningSecband(DWORD unk)
+{
+    FIXME("%x: stub\n", unk);
+    return FALSE;
+}
+
+/***********************************************************************
+ *           GetIUriPriv (urlmon.@)
+ *
+ * Not documented.
+ */
+HRESULT WINAPI GetIUriPriv(IUri *uri, void **p)
+{
+    FIXME("(%p,%p): stub\n", uri, p);
+    *p = NULL;
+    return E_NOTIMPL;
 }

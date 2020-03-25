@@ -4,6 +4,10 @@ add_definitions(
     -D_CRT_NONSTDC_NO_DEPRECATE
     -D__msvcrt_ulong=ULONG)
 
+if(GCC AND GCC_VERSION VERSION_GREATER 7)
+    add_compile_flags("-Wno-stringop-truncation")
+endif()
+
 list(APPEND SOURCE
     cpp.c
     data.c

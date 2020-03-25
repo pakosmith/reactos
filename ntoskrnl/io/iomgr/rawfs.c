@@ -148,7 +148,7 @@ RawCheckForDismount(IN PVCB Vcb,
         }
 
         /* Dismount our device if possible */
-        ObfDereferenceObject(Vcb->TargetDeviceObject);
+        ObDereferenceObject(Vcb->TargetDeviceObject);
         IoDeleteDevice((PDEVICE_OBJECT)CONTAINING_RECORD(Vcb,
                                                          VOLUME_DEVICE_OBJECT,
                                                          Vcb));
@@ -1187,9 +1187,9 @@ RawUnload(IN PDRIVER_OBJECT DriverObject)
 #endif
 }
 
+INIT_FUNCTION
 NTSTATUS
 NTAPI
-INIT_FUNCTION
 RawFsDriverEntry(IN PDRIVER_OBJECT DriverObject,
                  IN PUNICODE_STRING RegistryPath)
 {

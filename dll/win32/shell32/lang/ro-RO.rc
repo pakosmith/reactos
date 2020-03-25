@@ -68,6 +68,7 @@ BEGIN
         MENUITEM SEPARATOR
         MENUITEM "&Decupează", IDM_CUT
         MENUITEM "&Copiază", IDM_COPY
+        MENUITEM "&Lipește", IDM_INSERT
         MENUITEM SEPARATOR
         MENUITEM "Crează sc&urtătură", IDM_CREATELINK
         MENUITEM "Șt&erge", IDM_DELETE
@@ -81,11 +82,11 @@ IDM_DRAGFILE MENU
 BEGIN
     POPUP ""
     BEGIN
-        MENUITEM "&Copy here", IDM_COPYHERE
-        MENUITEM "&Move here", IDM_MOVEHERE
-        MENUITEM "Create &shortcuts here", IDM_LINKHERE
+        MENUITEM "&Copiază aici", IDM_COPYHERE
+        MENUITEM "&Mută aici", IDM_MOVEHERE
+        MENUITEM "Crea&ză scurtătură aici", IDM_LINKHERE
         MENUITEM SEPARATOR
-        MENUITEM "Cancel", 0
+        MENUITEM "Anulează", 0
     END
 END
 
@@ -96,7 +97,7 @@ FONT 8, "MS Shell Dlg"
 BEGIN
     DEFPUSHBUTTON "Con&firmă", 1, 60, 175, 60, 15, BS_DEFPUSHBUTTON | WS_GROUP | WS_TABSTOP
     PUSHBUTTON "A&nulează", 2, 125, 175, 60, 15, WS_GROUP | WS_TABSTOP
-    LTEXT "", IDC_BROWSE_FOR_FOLDER_TITLE, 4, 4, 180, 12
+    LTEXT "", IDC_BROWSE_FOR_FOLDER_TITLE, 4, 4, 180, 24
     LTEXT "", IDC_BROWSE_FOR_FOLDER_STATUS, 4, 25, 180, 12
     CONTROL "", IDC_BROWSE_FOR_FOLDER_TREEVIEW, "SysTreeView32", TVS_HASBUTTONS | TVS_HASLINES | TVS_LINESATROOT | WS_BORDER | WS_TABSTOP, 4, 40, 180, 120
 END
@@ -136,11 +137,7 @@ FONT 8, "MS Shell Dlg"
 BEGIN
     ICON "", IDC_ABOUT_ICON, 7, 55, 21, 20
     LTEXT "", IDC_ABOUT_APPNAME, 35, 55, 200, 10
-    LTEXT "Versiune", IDC_STATIC, 35, 65, 28, 10
-    LTEXT KERNEL_VERSION_STR, IDC_STATIC, 68, 65, 27, 10
-    LTEXT " (", IDC_STATIC, 95, 65, 5, 10
-    LTEXT KERNEL_VERSION_BUILD_STR, IDC_STATIC, 100, 65, 58, 10
-    LTEXT ")", IDC_STATIC, 158, 65, 5, 10
+    LTEXT "", IDC_ABOUT_VERSION, 35, 65, 250, 10
     LTEXT "Drept de autor 1998-", IDC_STATIC, 35, 75, 68, 10
     LTEXT COPYRIGHT_YEAR, IDC_STATIC, 103, 75, 17, 10
     LTEXT " Echipa ReactOS\0", IDC_STATIC, 120, 75, 53, 10
@@ -169,7 +166,7 @@ CAPTION "Executare"
 FONT 8, "MS Shell Dlg"
 BEGIN
     ICON "", IDC_RUNDLG_ICON, 7, 11, 18, 20, WS_VISIBLE
-    LTEXT "Tastați numele unui program, dosar, document, sau a unei resurse de Internet, în vederea deschiderii în ReactOS.", 12289, 36, 4, 182, 26
+    LTEXT "Tastați numele unui program, dosar, document, sau a unei resurse de Internet, în vederea deschiderii în ReactOS.", 12289, 36, 4, 185, 26
     LTEXT "&Deschide:", 12305, 7, 39, 33, 10
     CONTROL "", IDC_RUNDLG_EDITPATH, "COMBOBOX", WS_TABSTOP | WS_GROUP | WS_VSCROLL | WS_VISIBLE | CBS_AUTOHSCROLL | CBS_DROPDOWN, 41, 37, 179, 100
     DEFPUSHBUTTON "Con&firmă", IDOK, 36, 70, 59, 14, WS_TABSTOP
@@ -215,8 +212,8 @@ BEGIN
     CHECKBOX "Execută sub o i&dentitate explicită", IDC_SHORTEX_RUN_DIFFERENT, 25, 50, 150, 10
     LTEXT "Această opțiune vă permite execuția scurtăturii sub autoritatea unui alt utilizator sau continuarea folosirii scurtăturii în mod securizat, protejând astfel calculatorul de activități neautorizate.", -1, 50, 60, 175, 40
     CHECKBOX "Execută în sp&ațiu de memorie separat", IDC_SHORTEX_RUN_SEPARATE, 25, 100, 150, 10, WS_DISABLED
-    PUSHBUTTON "Con&firmă", 1, 63, 124, 50, 15, WS_VISIBLE
-    PUSHBUTTON "A&nulează", 2, 120, 124, 50, 15, WS_VISIBLE
+    PUSHBUTTON "Con&firmă", IDOK, 63, 124, 50, 15, WS_VISIBLE
+    PUSHBUTTON "A&nulează", IDCANCEL, 120, 124, 50, 15, WS_VISIBLE
 END
 
 IDD_FOLDER_PROPERTIES DIALOGEX 0, 0, 240, 205
@@ -261,7 +258,7 @@ BEGIN
     LTEXT "Va fi deschis cu:", 14006, 8, 53, 50, 10
     ICON "", 14025, 58, 52, 11, 10, NOT WS_VISIBLE
     PUSHBUTTON "Spe&cificare…", 14024, 168, 50, 60, 14, WS_CHILD | WS_VISIBLE | WS_TABSTOP
-    EDITTEXT 14007, 58, 53, 170, 10, ES_LEFT | ES_READONLY | NOT WS_BORDER | ES_AUTOHSCROLL | NOT WS_TABSTOP
+    EDITTEXT 14007, 58, 53, 100, 10, ES_LEFT | ES_READONLY | NOT WS_BORDER | ES_AUTOHSCROLL | NOT WS_TABSTOP
     LTEXT "", -1, 8, 68, 221, 1, SS_ETCHEDHORZ | WS_CHILD | WS_VISIBLE
     LTEXT "Locație:", 14008, 8, 75, 45, 10
     EDITTEXT 14009, 58, 75, 170, 10, ES_LEFT | ES_READONLY | NOT WS_BORDER | ES_AUTOHSCROLL | NOT WS_TABSTOP
@@ -386,7 +383,7 @@ STYLE DS_SHELLFONT | WS_CHILD | WS_DISABLED | WS_CAPTION
 CAPTION "Generale"
 FONT 8, "MS Shell Dlg", 0, 0, 0x0
 BEGIN
-    CONTROL "", 14000, "SysListView32", LVS_REPORT | LVS_SHAREIMAGELISTS | WS_BORDER | WS_TABSTOP, 10, 10, 220, 50
+    CONTROL "", 14000, "SysListView32", LVS_REPORT | LVS_SHOWSELALWAYS | LVS_SHAREIMAGELISTS | WS_BORDER | WS_TABSTOP, 10, 10, 220, 50
     GROUPBOX "Preferințe pentru locația aleasă", -1, 10, 72, 220, 70
     RADIOBUTTON "&Dimensiune specificată:", 14001, 20, 90, 80, 10, WS_TABSTOP
     EDITTEXT 14002, 110, 90, 50, 14, WS_TABSTOP | ES_NUMBER
@@ -493,7 +490,7 @@ CAPTION "Deautentificare"
 FONT 8, "MS Shell Dlg"
 BEGIN
     ICON IDI_SHELL_LOGOFF, IDC_STATIC, 8, 6, 21, 20
-    LTEXT "Sigur doriți să vă deautentificați?", IDC_STATIC, 35, 16, 146, 8
+    LTEXT "Sigur doriți să vă deautentificați?", -1, 35, 16, 146, 8
     DEFPUSHBUTTON "&Deautentifică", IDOK, 41, 39, 50, 14
     PUSHBUTTON "A&nulează", IDCANCEL, 95, 39, 50, 14
 END
@@ -752,6 +749,9 @@ BEGIN
     IDS_FONTS_DESCRIPTION "Adăugarea, modificarea, și gestiunea fonturilor din calculator."
     IDS_PRINTERS_DESCRIPTION "Prezentarea imprimantelor și faxurilor, precum și asistență la instalarea unora noi."
 
+    /* About shell dialog version string */
+    IDS_ABOUT_VERSION_STRING "Versiune %S (%S)"
+
     /* context menus */
     IDS_VIEW_LARGE "D&ale"
     IDS_VIEW_SMALL "&Pictograme"
@@ -770,6 +770,17 @@ BEGIN
     IDS_PASTE "&Lipește"
     IDS_EJECT "S&coate"
     IDS_DISCONNECT "Deconectea&ză"
+    IDS_OPENFILELOCATION "Open f&ile location"
+    IDS_DESKLINK "Desktop (Create shortcut)"
+    IDS_SENDTO_MENU "Se&nd To"
+
+    IDS_MOVEERRORTITLE "Error Moving File or Folder"
+    IDS_COPYERRORTITLE "Error Copying File or Folder"
+    IDS_MOVEERRORSAMEFOLDER "Cannot move '%s': The destination folder is the same as the source folder."
+    IDS_MOVEERRORSAME "Cannot move '%s': The source and destination file names are the same."
+    IDS_COPYERRORSAME "Cannot copy '%s': The source and destination file names are the same."
+    IDS_MOVEERRORSUBFOLDER "Cannot move '%s': The destination folder is a subfolder of the source folder."
+    IDS_COPYERRORSUBFOLDER "Cannot copy '%s': The destination folder is a subfolder of the source folder."
 
     IDS_CREATEFOLDER_DENIED "Nu poate fi creat un dosar cu numele „%1”"
     IDS_CREATEFOLDER_CAPTION "Nu poate fi creat dosar"
@@ -798,6 +809,11 @@ BEGIN
     IDS_RESTART_PROMPT "Doriți să reporniți sistemul?"
     IDS_SHUTDOWN_TITLE "Închidere"
     IDS_SHUTDOWN_PROMPT "Doriți să închideți calculatorul?"
+    
+    /* Format Dialog Strings */
+    IDS_FORMAT_TITLE "Formatare disc local"
+    IDS_FORMAT_WARNING "AVERTISMENT: Formatarea va șterge TOATE datele de pe acest disc.\nConfirmați pentru a formata, anulați pentru a ieși."
+    IDS_FORMAT_COMPLETE "Formatare completă."
 
     /* Run File dialog */
     IDS_RUNDLG_ERROR "„Executare fișier” nu a putut fi deschis (eroare internă)"
@@ -805,7 +821,7 @@ BEGIN
     IDS_RUNDLG_BROWSE_CAPTION "Specificare fișiere"
     IDS_RUNDLG_BROWSE_FILTER "Fișiere executabile (*.exe)\0*.exe\0Orice fișier (*.*)\0*.*\0"
 
-    /* shell folder path default values */
+    /* Shell folder path default values. See also: dll/win32/userenv/lang */
     IDS_PROGRAMS "Meniul Pornire\\Programe"
     IDS_PERSONAL "Documentele mele"
     IDS_FAVORITES "Favorite"
@@ -868,6 +884,7 @@ BEGIN
     IDS_CANTEJECTMEDIA "Eșec la scoaterea mediului de stocare (Cod de eroare: %lu)."
     IDS_CANTSHOWPROPERTIES "Eșec la inspecția proprietăților (Cod de eroare: %lu)."
     IDS_CANTDISCONNECT "Eșec la deconectare (Cod de eroare: %lu)."
+    IDS_NONE "(None)"
 
     /* Friendly File Type Names */
     IDS_DIRECTORY "Dosar"
@@ -904,6 +921,7 @@ BEGIN
     IDS_EDIT_VERB "Editează"
     IDS_FIND_VERB "Caută"
     IDS_PRINT_VERB "Imprimă"
+    IDS_CMD_VERB "Command Prompt here"
 
     IDS_FILE_FOLDER "%u fișiere, %u dosare"
     IDS_PRINTERS "Imprimante"

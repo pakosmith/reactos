@@ -196,8 +196,31 @@ private:
         HWND hwndCustomizeClassic = GetDlgItem(IDC_TASKBARPROP_STARTMENUCLASSICCUST);
         HWND hwndCustomizeModern = GetDlgItem(IDC_TASKBARPROP_STARTMENUCUST);
         HWND hwndStartBitmap = GetDlgItem(IDC_TASKBARPROP_STARTMENU_BITMAP);
+        HWND hwndModernRadioBtn = GetDlgItem(IDC_TASKBARPROP_STARTMENU);
+        HWND hwndModernText = GetDlgItem(IDC_TASKBARPROP_STARTMENUMODERNTEXT);
+        BOOL policyNoSimpleStartMenu = SHRestricted(REST_NOSTARTPANEL) != 0;
+        BOOL bModern = FALSE;
 
-        BOOL bModern = IsDlgButtonChecked(IDC_TASKBARPROP_STARTMENU);
+        /* If NoSimpleStartMenu, disable ability to use Modern Start Menu */
+        if (policyNoSimpleStartMenu)
+        {
+            /* Switch to classic */
+            CheckDlgButton(IDC_TASKBARPROP_STARTMENUCLASSIC, BST_CHECKED);
+
+            /* Disable radio button */
+            ::EnableWindow(hwndModernRadioBtn, FALSE);
+
+            /* Hide controls related to modern menu */
+            ::ShowWindow(hwndModernRadioBtn, SW_HIDE);
+            ::ShowWindow(hwndModernText, SW_HIDE);
+            ::ShowWindow(hwndCustomizeModern, SW_HIDE);
+        }
+        /* If no restrictions, then get bModern from dialog */
+        else
+        {
+            bModern = IsDlgButtonChecked(IDC_TASKBARPROP_STARTMENU);
+        }
+
         ::EnableWindow(hwndCustomizeModern, bModern);
         ::EnableWindow(hwndCustomizeClassic, !bModern);
 
@@ -227,8 +250,10 @@ public:
 
     LRESULT OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandled)
     {
-        CheckDlgButton(IDC_TASKBARPROP_STARTMENUCLASSIC, BST_CHECKED);    // HACK: This has to be read from registry!
+        // fix me: start menu style (classic/modern) should be read somewhere from the registry.
+        CheckDlgButton(IDC_TASKBARPROP_STARTMENUCLASSIC, BST_CHECKED); // HACK: This has to be read from registry!!!!!!!
         UpdateDialog();
+    
         return TRUE;
     }
 
@@ -244,6 +269,23 @@ public:
         return PSNRET_NOERROR;
     }
 };
+
+static int CALLBACK
+PropSheetProc(HWND hwndDlg, UINT uMsg, LPARAM lParam)
+{
+    // NOTE: This callback is needed to set large icon correctly.
+    HICON hIcon;
+    switch (uMsg)
+    {
+        case PSCB_INITIALIZED:
+        {
+            hIcon = LoadIconW(hExplorerInstance, MAKEINTRESOURCEW(IDI_STARTMENU));
+            SendMessageW(hwndDlg, WM_SETICON, ICON_BIG, (LPARAM)hIcon);
+            break;
+        }
+    }
+    return 0;
+}
 
 VOID
 DisplayTrayProperties(IN HWND hwndOwner, IN HWND hwndTaskbar)
@@ -261,14 +303,15 @@ DisplayTrayProperties(IN HWND hwndOwner, IN HWND hwndTaskbar)
 
     ZeroMemory(&psh, sizeof(psh));
     psh.dwSize = sizeof(psh);
-    psh.dwFlags =  PSH_PROPTITLE;
+    psh.dwFlags =  PSH_PROPTITLE | PSH_USEICONID | PSH_USECALLBACK;
     psh.hwndParent = hwndOwner;
     psh.hInstance = hExplorerInstance;
-    psh.hIcon = NULL;
+    psh.pszIcon = MAKEINTRESOURCEW(IDI_STARTMENU);
     psh.pszCaption = caption.GetString();
     psh.nPages = _countof(hpsp);
     psh.nStartPage = 0;
     psh.phpage = hpsp;
+    psh.pfnCallback = PropSheetProc;
 
     PropertySheet(&psh);
 }

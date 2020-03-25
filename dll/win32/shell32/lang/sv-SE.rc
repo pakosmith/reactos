@@ -66,6 +66,7 @@ BEGIN
         MENUITEM SEPARATOR
         MENUITEM "K&lipp ut", IDM_CUT
         MENUITEM "&Kopiera", IDM_COPY
+        MENUITEM "Paste", IDM_INSERT
         MENUITEM SEPARATOR
         MENUITEM "Skapa &genväg", IDM_CREATELINK
         MENUITEM "&Ta bort", IDM_DELETE
@@ -94,7 +95,7 @@ FONT 8, "MS Shell Dlg"
 BEGIN
     DEFPUSHBUTTON "OK", 1, 60, 175, 60, 15, BS_DEFPUSHBUTTON | WS_GROUP | WS_TABSTOP
     PUSHBUTTON "Avbryt", 2, 125, 175, 60, 15, WS_GROUP | WS_TABSTOP
-    LTEXT "", IDC_BROWSE_FOR_FOLDER_TITLE, 4, 4, 180, 12
+    LTEXT "", IDC_BROWSE_FOR_FOLDER_TITLE, 4, 4, 180, 24
     LTEXT "", IDC_BROWSE_FOR_FOLDER_STATUS, 4, 25, 180, 12
     CONTROL "", IDC_BROWSE_FOR_FOLDER_TREEVIEW, "SysTreeView32", TVS_HASBUTTONS | TVS_HASLINES | TVS_LINESATROOT | TVS_EDITLABELS | WS_BORDER | WS_TABSTOP, 4, 40, 180, 120
 END
@@ -134,11 +135,7 @@ FONT 8, "MS Shell Dlg"
 BEGIN
     ICON "", IDC_ABOUT_ICON, 7, 55, 21, 20
     LTEXT "", IDC_ABOUT_APPNAME, 35, 55, 200, 10
-    LTEXT "Version ", IDC_STATIC, 35, 65, 28, 10
-    LTEXT KERNEL_VERSION_STR, IDC_STATIC, 63, 65, 27, 10
-    LTEXT " (", IDC_STATIC, 90, 65, 5, 10
-    LTEXT KERNEL_VERSION_BUILD_STR, IDC_STATIC, 95, 65, 58, 10
-    LTEXT ")", IDC_STATIC, 153, 65, 5, 10
+    LTEXT "", IDC_ABOUT_VERSION, 35, 65, 250, 10
     LTEXT "Copyright 1998-", IDC_STATIC, 35, 75, 53, 10
     LTEXT COPYRIGHT_YEAR, IDC_STATIC, 88, 75, 17, 10
     LTEXT " ReactOS-gruppen\0", IDC_STATIC, 105, 75, 60, 10
@@ -167,7 +164,7 @@ CAPTION "Kör"
 FONT 8, "MS Shell Dlg"
 BEGIN
     ICON "", IDC_RUNDLG_ICON, 7, 11, 18, 20, WS_VISIBLE
-    LTEXT "Skriv namnet på ett program, en mapp, ett dokument eller en internetresurs som du vill öppna.", 12289, 36, 11, 182, 18
+    LTEXT "Skriv namnet på ett program, en mapp, ett dokument eller en internetresurs som du vill öppna.", 12289, 36, 11, 185, 18
     LTEXT "&Öppna:", 12305, 7, 39, 24, 10
     CONTROL "", IDC_RUNDLG_EDITPATH, "COMBOBOX", WS_TABSTOP | WS_GROUP | WS_VSCROLL | WS_VISIBLE | CBS_AUTOHSCROLL | CBS_DROPDOWN, 36, 37, 184, 100
     DEFPUSHBUTTON "OK", IDOK, 62, 70, 50, 14, WS_TABSTOP
@@ -213,8 +210,8 @@ BEGIN
     CHECKBOX "Kör med andra användaruppgifter", IDC_SHORTEX_RUN_DIFFERENT, 25, 50, 150, 10
     LTEXT "Det här alternativet tillåter dig att köra genvägen som en annan användare eller som dig själv samtidigt som din dator skyddas från otillåten programaktivitet.", -1, 50, 60, 175, 40
     CHECKBOX "Kör i seperat minnesutrymme", IDC_SHORTEX_RUN_SEPARATE, 25, 100, 150, 10, WS_DISABLED
-    PUSHBUTTON "OK", 1, 63, 124, 50, 15, WS_VISIBLE
-    PUSHBUTTON "Avbryt", 2, 120, 124, 50, 15, WS_VISIBLE
+    PUSHBUTTON "OK", IDOK, 63, 124, 50, 15, WS_VISIBLE
+    PUSHBUTTON "Avbryt", IDCANCEL, 120, 124, 50, 15, WS_VISIBLE
 END
 
 IDD_FOLDER_PROPERTIES DIALOGEX 0, 0, 240, 205
@@ -259,7 +256,7 @@ BEGIN
     LTEXT "Öppna med:", 14006, 8, 53, 50, 10
     ICON "", 14025, 58, 52, 11, 10, NOT WS_VISIBLE
     PUSHBUTTON "&Ändra...", 14024, 168, 50, 60, 14, WS_CHILD | WS_VISIBLE | WS_TABSTOP
-    EDITTEXT 14007, 58, 53, 170, 10, ES_LEFT | ES_READONLY | NOT WS_BORDER | ES_AUTOHSCROLL | NOT WS_TABSTOP
+    EDITTEXT 14007, 58, 53, 100, 10, ES_LEFT | ES_READONLY | NOT WS_BORDER | ES_AUTOHSCROLL | NOT WS_TABSTOP
     LTEXT "", -1, 8, 68, 221, 1, SS_ETCHEDHORZ | WS_CHILD | WS_VISIBLE
     LTEXT "Plats:", 14008, 8, 75, 45, 10
     EDITTEXT 14009, 58, 75, 170, 10, ES_LEFT | ES_READONLY | NOT WS_BORDER | ES_AUTOHSCROLL | NOT WS_TABSTOP
@@ -384,7 +381,7 @@ STYLE DS_SHELLFONT | WS_CHILD | WS_DISABLED | WS_CAPTION
 CAPTION "Egenskaper för Papperskorgen"
 FONT 8, "MS Shell Dlg", 0, 0, 0x0
 BEGIN
-    CONTROL "", 14000, "SysListView32", LVS_REPORT | LVS_SHAREIMAGELISTS | WS_BORDER | WS_TABSTOP, 10, 10, 220, 50
+    CONTROL "", 14000, "SysListView32", LVS_REPORT | LVS_SHOWSELALWAYS | LVS_SHAREIMAGELISTS | WS_BORDER | WS_TABSTOP, 10, 10, 220, 50
     GROUPBOX "Inställningar för vald plats", -1, 10, 72, 220, 70
     RADIOBUTTON "&Användardefinierad storlek:", 14001, 20, 90, 100, 10, WS_TABSTOP
     EDITTEXT 14002, 132, 87, 50, 14, WS_TABSTOP | ES_NUMBER
@@ -750,6 +747,9 @@ BEGIN
     IDS_FONTS_DESCRIPTION "Add, change, and manage fonts on your computer."
     IDS_PRINTERS_DESCRIPTION "Shows installed printers and fax printers and helps you add new ones."
 
+    /* About shell dialog version string */
+    IDS_ABOUT_VERSION_STRING "Version %S (%S)"
+
     /* context menus */
     IDS_VIEW_LARGE "Sto&ra ikoner"
     IDS_VIEW_SMALL "S&må ikoner"
@@ -768,6 +768,17 @@ BEGIN
     IDS_PASTE "Klistra in"
     IDS_EJECT "Eject"
     IDS_DISCONNECT "Disconnect"
+    IDS_OPENFILELOCATION "Open f&ile location"
+    IDS_DESKLINK "Desktop (Create shortcut)"
+    IDS_SENDTO_MENU "Se&nd To"
+
+    IDS_MOVEERRORTITLE "Error Moving File or Folder"
+    IDS_COPYERRORTITLE "Error Copying File or Folder"
+    IDS_MOVEERRORSAMEFOLDER "Cannot move '%s': The destination folder is the same as the source folder."
+    IDS_MOVEERRORSAME "Cannot move '%s': The source and destination file names are the same."
+    IDS_COPYERRORSAME "Cannot copy '%s': The source and destination file names are the same."
+    IDS_MOVEERRORSUBFOLDER "Cannot move '%s': The destination folder is a subfolder of the source folder."
+    IDS_COPYERRORSUBFOLDER "Cannot copy '%s': The destination folder is a subfolder of the source folder."
 
     IDS_CREATEFOLDER_DENIED "Kunde inte skapa mappen '%1'"
     IDS_CREATEFOLDER_CAPTION "Kunde inte skapa mapp"
@@ -796,6 +807,11 @@ BEGIN
     IDS_RESTART_PROMPT "Vill du starta om systemet?"
     IDS_SHUTDOWN_TITLE "Stäng av"
     IDS_SHUTDOWN_PROMPT "Vill du stänga av?"
+    
+    /* Format Dialog Strings */
+    IDS_FORMAT_TITLE "Format Local Disk"
+    IDS_FORMAT_WARNING "WARNING: Formatting will erase ALL data on this disk.\nTo format the disk, click OK. To quit, click CANCEL."
+    IDS_FORMAT_COMPLETE "Format Complete."
 
     /* Run File dialog */
     IDS_RUNDLG_ERROR "Kunde inte visa dialogen Kör fil (internt fel)"
@@ -803,7 +819,7 @@ BEGIN
     IDS_RUNDLG_BROWSE_CAPTION "Bläddra"
     IDS_RUNDLG_BROWSE_FILTER "Körbara filer (*.exe)\0*.exe\0Alla filer (*.*)\0*.*\0"
 
-    /* shell folder path default values */
+    /* Shell folder path default values. See also: dll/win32/userenv/lang */
     IDS_PROGRAMS "Start-meny\\Program"
     IDS_PERSONAL "Mina dokument"
     IDS_FAVORITES "Favoriter"
@@ -866,6 +882,7 @@ BEGIN
     IDS_CANTEJECTMEDIA "Unable to eject media (Error Code: %lu)."
     IDS_CANTSHOWPROPERTIES "Unable to show properties (Error Code: %lu)."
     IDS_CANTDISCONNECT "Unable to disconnect (Error Code: %lu)."
+    IDS_NONE "(None)"
 
     /* Friendly File Type Names */
     IDS_DIRECTORY "Mapp"
@@ -902,6 +919,7 @@ BEGIN
     IDS_EDIT_VERB "Redigera"
     IDS_FIND_VERB "Hitta"
     IDS_PRINT_VERB "Skriv ut"
+    IDS_CMD_VERB "Command Prompt here"
 
     IDS_FILE_FOLDER "%u filer, %u mappar"
     IDS_PRINTERS "Skrivare"

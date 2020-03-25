@@ -81,13 +81,16 @@ void UpdateWindowCaption(BOOL clearModifyAlert)
     /* When a file is being opened or created, there is no need to have the edited flag shown
        when the new or opened file has not been edited yet */
     if (clearModifyAlert)
-        StringCbPrintf(szCaption, ARRAY_SIZE(szCaption), _T("%s - %s"), szFilename, szNotepad);
+    {
+        StringCbPrintf(szCaption, sizeof(szCaption), _T("%s - %s"),
+                       szFilename, szNotepad);
+    }
     else
     {
         BOOL isModified = (SendMessage(Globals.hEdit, EM_GETMODIFY, 0, 0) ? TRUE : FALSE);
 
         /* Update the caption based upon if the user has modified the contents of the file or not */
-        StringCbPrintf(szCaption, ARRAY_SIZE(szCaption), _T("%s%s - %s"),
+        StringCbPrintf(szCaption, sizeof(szCaption), _T("%s%s - %s"),
             (isModified ? _T("*") : _T("")), szFilename, szNotepad);
     }
 
@@ -1095,7 +1098,7 @@ DIALOG_GoTo_DialogProc(HWND hwndDialog, UINT uMsg, WPARAM wParam, LPARAM lParam)
     switch(uMsg) {
     case WM_INITDIALOG:
         hTextBox = GetDlgItem(hwndDialog, ID_LINENUMBER);
-        _sntprintf(szText, ARRAY_SIZE(szText), _T("%ld"), lParam);
+        _sntprintf(szText, ARRAY_SIZE(szText), _T("%Id"), lParam);
         SetWindowText(hTextBox, szText);
         break;
     case WM_COMMAND:
@@ -1191,46 +1194,15 @@ VOID DIALOG_HelpContents(VOID)
 VOID DIALOG_HelpAboutNotepad(VOID)
 {
     TCHAR szNotepad[MAX_STRING_LEN];
+    TCHAR szNotepadAuthors[MAX_STRING_LEN];
+
     HICON notepadIcon = LoadIcon(Globals.hInstance, MAKEINTRESOURCE(IDI_NPICON));
 
     LoadString(Globals.hInstance, STRING_NOTEPAD, szNotepad, ARRAY_SIZE(szNotepad));
-    ShellAbout(Globals.hMainWnd, szNotepad, 0, notepadIcon);
+    LoadString(Globals.hInstance, STRING_NOTEPAD_AUTHORS, szNotepadAuthors, ARRAY_SIZE(szNotepadAuthors));
+
+    ShellAbout(Globals.hMainWnd, szNotepad, szNotepadAuthors, notepadIcon);
     DeleteObject(notepadIcon);
-}
-
-INT_PTR
-CALLBACK
-AboutDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
-{
-    HWND hLicenseEditWnd;
-    TCHAR *strLicense;
-
-    switch (message)
-    {
-    case WM_INITDIALOG:
-
-        hLicenseEditWnd = GetDlgItem(hDlg, IDC_LICENSE);
-
-        /* 0x1000 should be enough */
-        strLicense = (TCHAR *)_alloca(0x1000);
-        LoadString(GetModuleHandle(NULL), STRING_LICENSE, strLicense, 0x1000);
-
-        SetWindowText(hLicenseEditWnd, strLicense);
-
-        return TRUE;
-
-    case WM_COMMAND:
-
-        if ((LOWORD(wParam) == IDOK) || (LOWORD(wParam) == IDCANCEL))
-        {
-            EndDialog(hDlg, LOWORD(wParam));
-            return TRUE;
-        }
-
-        break;
-    }
-
-    return 0;
 }
 
 /***********************************************************************

@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2018, Intel Corp.
+ * Copyright (C) 2000 - 2020, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -301,7 +301,7 @@ AcpiEvAddressSpaceDispatch (
         /*
          * For handlers other than the default (supplied) handlers, we must
          * exit the interpreter because the handler *might* block -- we don't
-         * know what it will do, so we can't hold the lock on the intepreter.
+         * know what it will do, so we can't hold the lock on the interpreter.
          */
         AcpiExExitInterpreter();
     }
@@ -929,11 +929,11 @@ AcpiEvOrphanEcRegMethod (
     Objects[1].Type = ACPI_TYPE_INTEGER;
     Objects[1].Integer.Value = ACPI_REG_CONNECT;
 
-    Status = AcpiEvaluateObject (RegMethod, NULL, &Args, NULL);
+    (void) AcpiEvaluateObject (RegMethod, NULL, &Args, NULL);
 
 Exit:
     /* We ignore all errors from above, don't care */
 
-    Status = AcpiUtAcquireMutex (ACPI_MTX_NAMESPACE);
+    (void) AcpiUtAcquireMutex (ACPI_MTX_NAMESPACE);
     return_VOID;
 }

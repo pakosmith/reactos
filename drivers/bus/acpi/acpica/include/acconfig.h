@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2018, Intel Corp.
+ * Copyright (C) 2000 - 2020, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -131,9 +131,9 @@
 
 #define ACPI_DEFAULT_PAGE_SIZE          4096    /* Must be power of 2 */
 
-/* OwnerId tracking. 8 entries allows for 255 OwnerIds */
+/* OwnerId tracking. 128 entries allows for 4095 OwnerIds */
 
-#define ACPI_NUM_OWNERID_MASKS          8
+#define ACPI_NUM_OWNERID_MASKS          128
 
 /* Size of the root table array is increased by this increment */
 
@@ -178,7 +178,7 @@
 
 /*
  * Maximal number of elements the Result Stack can contain,
- * it may be an arbitray value not exceeding the types of
+ * it may be an arbitrary value not exceeding the types of
  * ResultSize and ResultCount (now UINT8).
  */
 #define ACPI_RESULTS_OBJ_NUM_MAX        255

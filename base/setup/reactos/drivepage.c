@@ -33,6 +33,9 @@
 
 #include "resource.h"
 
+#define NDEBUG
+#include <debug.h>
+
 /* GLOBALS ******************************************************************/
 
 #define IDS_LIST_COLUMN_FIRST IDS_PARTITION_NAME
@@ -500,8 +503,11 @@ PrintDiskData(
                               0, 0,
                               (LPARAM)DiskEntry);
 
-    /* Disk type (MBR or GPT) */
-    TreeList_SetItemText(hWndList, htiDisk, 1, DiskEntry->NoMbr ? L"GPT" : L"MBR");
+    /* Disk type: MBR, GPT or RAW (Uninitialized) */
+    TreeList_SetItemText(hWndList, htiDisk, 1,
+                         DiskEntry->DiskStyle == PARTITION_STYLE_MBR ? L"MBR" :
+                         DiskEntry->DiskStyle == PARTITION_STYLE_GPT ? L"GPT" :
+                                                                       L"RAW");
 
     /* Format the disk size in KBs, MBs, etc... */
     DiskSize.QuadPart = DiskEntry->SectorCount.QuadPart * DiskEntry->BytesPerSector;
@@ -785,15 +791,20 @@ DisableWizNext:
                     DISKENTRY DiskEntry;
                     PARTENTRY PartEntry;
                     DiskEntry.DiskNumber = 0;
-                    DiskEntry.BiosDiskNumber = 0;
+                    DiskEntry.HwDiskNumber = 0;
+                    DiskEntry.HwFixedDiskNumber = 0;
+                    PartEntry.DiskEntry = &DiskEntry;
                     PartEntry.PartitionNumber = 1; // 4;
                     /****/
 
                     Status = InitDestinationPaths(&pSetupData->USetupData,
                                                   NULL, // pSetupData->USetupData.InstallationDirectory,
-                                                  &DiskEntry, &PartEntry);
-                    // TODO: Check Status
-                    UNREFERENCED_PARAMETER(Status);
+                                                  &PartEntry);
+
+                    if (!NT_SUCCESS(Status))
+                    {
+                        DPRINT1("InitDestinationPaths() failed with status 0x%08lx\n", Status);
+                    }
 
                     break;
                 }

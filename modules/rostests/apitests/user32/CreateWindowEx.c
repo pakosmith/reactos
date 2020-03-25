@@ -3,7 +3,7 @@
  * LICENSE:         LGPLv2.1+ - See COPYING.LIB in the top level directory
  * PURPOSE:         Test for CreateWindowEx
  * PROGRAMMERS:     Thomas Faber <thomas.faber@reactos.org>
- *                  Mark Jansen
+ *                  Mark Jansen (mark.jansen@reactos.org)
  */
 
 #include "precomp.h"
@@ -94,6 +94,7 @@ DWORD g_ChildNcExpectExStyle = 0;
 DWORD g_ChildExpectStyle = 0;
 DWORD g_ChildExpectExStyle = 0;
 
+#undef ok_hex_
 #define ok_hex_(expression, result) \
     do { \
         int _value = (expression); \
@@ -805,7 +806,7 @@ static LRESULT CALLBACK MSGTestProcMDI2(HWND hWnd, UINT message, WPARAM wParam, 
         mcs.style = WS_MAXIMIZE;
 
         hchild = (HWND) SendMessage (g_hwndMDIClient, WM_MDICREATE, 0,
-            (LONG)(LPMDICREATESTRUCT) &mcs);
+            (LPARAM)&mcs);
         ok(hchild == g_ChildWindow, "We are testing with %p instead of %p\n", g_ChildWindow, hchild);
 
     }

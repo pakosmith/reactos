@@ -434,9 +434,9 @@ ApphelpCacheWrite(VOID)
 }
 
 
+INIT_FUNCTION
 NTSTATUS
 NTAPI
-INIT_FUNCTION
 ApphelpCacheInitialize(VOID)
 {
     DPRINT("SHIMS: ApphelpCacheInitialize\n");
@@ -764,6 +764,7 @@ NtApphelpCacheControl(
             }
             break;
         case ApphelpCacheServiceFlush:
+            /* FIXME: Check for admin or system here. */
             Status = ApphelpCacheFlush();
             break;
         case ApphelpCacheServiceDump:

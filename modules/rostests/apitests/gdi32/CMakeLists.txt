@@ -54,6 +54,7 @@ list(APPEND SOURCE
     GetTextExtentExPoint.c
     GetTextFace.c
     GetTextMetrics.c
+    LPtoDP.c
     MaskBlt.c
     NtGdiAddFontResource.c
     OffsetClipRgn.c
@@ -73,6 +74,7 @@ list(APPEND SOURCE
     SetSysColors.c
     SetWindowExtEx.c
     SetWorldTransform.c
+    TextTransform.c
     init.c
     precomp.h)
 

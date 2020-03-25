@@ -167,8 +167,18 @@ ExGetPoolTagInfo(
     IN OUT PULONG ReturnLength OPTIONAL
 );
 
+typedef struct _UUID_CACHED_VALUES_STRUCT
+{
+    ULONGLONG Time;
+    LONG AllocatedCount;
+    UCHAR ClockSeqHiAndReserved;
+    UCHAR ClockSeqLow;
+    UCHAR NodeId [ 6 ] ;
+} UUID_CACHED_VALUES_STRUCT, *PUUID_CACHED_VALUES_STRUCT;
+
 /* INITIALIZATION FUNCTIONS *************************************************/
 
+INIT_FUNCTION
 BOOLEAN
 NTAPI
 ExpWin32kInit(VOID);
@@ -183,6 +193,7 @@ Phase1Initialization(
     IN PVOID Context
 );
 
+INIT_FUNCTION
 VOID
 NTAPI
 ExpInitializePushLocks(VOID);
@@ -193,6 +204,7 @@ ExRefreshTimeZoneInformation(
     IN PLARGE_INTEGER SystemBootTime
 );
 
+INIT_FUNCTION
 VOID
 NTAPI
 ExpInitializeWorkerThreads(VOID);
@@ -201,10 +213,12 @@ VOID
 NTAPI
 ExSwapinWorkerThreads(IN BOOLEAN AllowSwap);
 
+INIT_FUNCTION
 VOID
 NTAPI
 ExpInitLookasideLists(VOID);
 
+INIT_FUNCTION
 VOID
 NTAPI
 ExInitializeSystemLookasideList(
@@ -216,14 +230,22 @@ ExInitializeSystemLookasideList(
     IN PLIST_ENTRY ListHead
 );
 
+INIT_FUNCTION
 BOOLEAN
 NTAPI
 ExpInitializeCallbacks(VOID);
 
-VOID
+INIT_FUNCTION
+BOOLEAN
 NTAPI
-ExpInitUuids(VOID);
+ExpUuidInitialization(VOID);
 
+INIT_FUNCTION
+BOOLEAN
+NTAPI
+ExLuidInitialization(VOID);
+
+INIT_FUNCTION
 VOID
 NTAPI
 ExpInitializeExecutive(
@@ -235,38 +257,47 @@ VOID
 NTAPI
 ExShutdownSystem(VOID);
 
+INIT_FUNCTION
 BOOLEAN
 NTAPI
 ExpInitializeEventImplementation(VOID);
 
+INIT_FUNCTION
 BOOLEAN
 NTAPI
 ExpInitializeKeyedEventImplementation(VOID);
 
+INIT_FUNCTION
 BOOLEAN
 NTAPI
 ExpInitializeEventPairImplementation(VOID);
 
+INIT_FUNCTION
 BOOLEAN
 NTAPI
 ExpInitializeSemaphoreImplementation(VOID);
 
+INIT_FUNCTION
 BOOLEAN
 NTAPI
 ExpInitializeMutantImplementation(VOID);
 
+INIT_FUNCTION
 BOOLEAN
 NTAPI
 ExpInitializeTimerImplementation(VOID);
 
+INIT_FUNCTION
 BOOLEAN
 NTAPI
 ExpInitializeProfileImplementation(VOID);
 
+INIT_FUNCTION
 VOID
 NTAPI
 ExpResourceInitialization(VOID);
 
+INIT_FUNCTION
 VOID
 NTAPI
 ExInitPoolLookasidePointers(VOID);
@@ -406,6 +437,7 @@ typedef BOOLEAN
     ULONG_PTR Context
 );
 
+INIT_FUNCTION
 VOID
 NTAPI
 ExpInitializeHandleTables(
@@ -741,6 +773,16 @@ ExCompareSwapFastReference(IN PEX_FAST_REF FastRef,
 }
 
 /* RUNDOWN *******************************************************************/
+
+FORCEINLINE
+PEX_RUNDOWN_REF
+ExGetRunRefForGivenProcessor(IN PEX_RUNDOWN_REF_CACHE_AWARE RunRefCacheAware,
+                             IN ULONG ProcNumber)
+{
+    return (PEX_RUNDOWN_REF)((ULONG_PTR)RunRefCacheAware->RunRefs +
+                             RunRefCacheAware->RunRefSize *
+                             (ProcNumber % RunRefCacheAware->Number));
+}
 
 /*++
  * @name ExfAcquireRundownProtection
@@ -1451,12 +1493,14 @@ ExTimerRundown(
     VOID
 );
 
+INIT_FUNCTION
 VOID
 NTAPI
 HeadlessInit(
     IN PLOADER_PARAMETER_BLOCK LoaderBlock
 );
 
+INIT_FUNCTION
 VOID
 NTAPI
 XIPInit(

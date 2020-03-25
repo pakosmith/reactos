@@ -426,7 +426,7 @@ static void fill_filename_from_selection(FileDialogImpl *This)
                 (!(This->options & FOS_PICKFOLDERS) &&  (attr & SFGAO_FOLDER))))
                 continue;
 
-            hr = IShellItem_GetDisplayName(psi, SIGDN_PARENTRELATIVEPARSING, &names[valid_count]);
+            hr = IShellItem_GetDisplayName(psi, (This->options & FOS_PICKFOLDERS) ? SIGDN_FILESYSPATH : SIGDN_PARENTRELATIVEPARSING, &names[valid_count]);
             if(SUCCEEDED(hr))
             {
                 len_total += lstrlenW(names[valid_count]) + 3;
@@ -1286,7 +1286,7 @@ static UINT ctrl_container_resize(FileDialogImpl *This, UINT container_width)
 
     /* Move the controls to their final destination
      */
-    cur_col_pos = 0, cur_row_pos = 0;
+    cur_col_pos = 0; cur_row_pos = 0;
     LIST_FOR_EACH_ENTRY(ctrl, &This->cctrls, customctrl, entry)
     {
         if(ctrl->cdcstate & CDCS_VISIBLE)

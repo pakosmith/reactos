@@ -16,8 +16,10 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#include "config.h"
-#include "wine/port.h"
+#ifdef __REACTOS__
+#include <wine/config.h>
+#include <wine/port.h>
+#endif
 
 #include <math.h>
 #include <assert.h>
@@ -390,9 +392,10 @@ static inline jsval_t steal_ret(call_frame_t *frame)
     return r;
 }
 
-static inline void clear_ret(call_frame_t *frame)
+static inline void clear_acc(script_ctx_t *ctx)
 {
-    jsval_release(steal_ret(frame));
+    jsval_release(ctx->acc);
+    ctx->acc = jsval_undefined();
 }
 
 static HRESULT scope_push(scope_chain_t *scope, jsdisp_t *jsobj, IDispatch *obj, scope_chain_t **ret)
@@ -618,9 +621,9 @@ static BOOL lookup_global_members(script_ctx_t *ctx, BSTR identifier, exprval_t 
     return FALSE;
 }
 
-static int local_ref_cmp(const void *key, const void *ref)
+static int __cdecl local_ref_cmp(const void *key, const void *ref)
 {
-    return strcmpW((const WCHAR*)key, ((const local_ref_t*)ref)->name);
+    return wcscmp((const WCHAR*)key, ((const local_ref_t*)ref)->name);
 }
 
 local_ref_t *lookup_local(const function_code_t *function, const WCHAR *identifier)
@@ -652,7 +655,7 @@ static HRESULT identifier_eval(script_ctx_t *ctx, BSTR identifier, exprval_t *re
                     return S_OK;
                 }
 
-                if(!strcmpW(identifier, argumentsW)) {
+                if(!wcscmp(identifier, argumentsW)) {
                     hres = detach_variable_object(ctx, scope->frame, FALSE);
                     if(FAILED(hres))
                         return hres;
@@ -676,7 +679,7 @@ static HRESULT identifier_eval(script_ctx_t *ctx, BSTR identifier, exprval_t *re
     }
 
     for(item = ctx->named_items; item; item = item->next) {
-        if((item->flags & SCRIPTITEM_ISVISIBLE) && !strcmpW(item->name, identifier)) {
+        if((item->flags & SCRIPTITEM_ISVISIBLE) && !wcscmp(item->name, identifier)) {
             if(!item->disp) {
                 IUnknown *unk;
 
@@ -1160,7 +1163,6 @@ static HRESULT interp_refval(script_ctx_t *ctx)
 static HRESULT interp_new(script_ctx_t *ctx)
 {
     const unsigned argc = get_op_uint(ctx, 0);
-    call_frame_t *frame = ctx->call_ctx;
     jsval_t constr;
 
     TRACE("%d\n", argc);
@@ -1176,9 +1178,9 @@ static HRESULT interp_new(script_ctx_t *ctx)
     else if(!get_object(constr))
         return throw_type_error(ctx, JS_E_INVALID_PROPERTY, NULL);
 
-    clear_ret(frame);
+    clear_acc(ctx);
     return disp_call_value(ctx, get_object(constr), NULL, DISPATCH_CONSTRUCT | DISPATCH_JSCRIPT_CALLEREXECSSOURCE,
-                           argc, stack_args(ctx, argc), &frame->ret);
+                           argc, stack_args(ctx, argc), &ctx->acc);
 }
 
 /* ECMA-262 3rd Edition    11.2.3 */
@@ -1186,7 +1188,6 @@ static HRESULT interp_call(script_ctx_t *ctx)
 {
     const unsigned argn = get_op_uint(ctx, 0);
     const int do_ret = get_op_int(ctx, 1);
-    call_frame_t *frame = ctx->call_ctx;
     jsval_t obj;
 
     TRACE("%d %d\n", argn, do_ret);
@@ -1195,9 +1196,9 @@ static HRESULT interp_call(script_ctx_t *ctx)
     if(!is_object_instance(obj))
         return throw_type_error(ctx, JS_E_INVALID_PROPERTY, NULL);
 
-    clear_ret(frame);
+    clear_acc(ctx);
     return disp_call_value(ctx, get_object(obj), NULL, DISPATCH_METHOD | DISPATCH_JSCRIPT_CALLEREXECSSOURCE,
-                           argn, stack_args(ctx, argn), do_ret ? &frame->ret : NULL);
+                           argn, stack_args(ctx, argn), do_ret ? &ctx->acc : NULL);
 }
 
 /* ECMA-262 3rd Edition    11.2.3 */
@@ -1205,7 +1206,6 @@ static HRESULT interp_call_member(script_ctx_t *ctx)
 {
     const unsigned argn = get_op_uint(ctx, 0);
     const int do_ret = get_op_int(ctx, 1);
-    call_frame_t *frame = ctx->call_ctx;
     exprval_t ref;
 
     TRACE("%d %d\n", argn, do_ret);
@@ -1213,9 +1213,9 @@ static HRESULT interp_call_member(script_ctx_t *ctx)
     if(!stack_topn_exprval(ctx, argn, &ref))
         return throw_type_error(ctx, ref.u.hres, NULL);
 
-    clear_ret(frame);
+    clear_acc(ctx);
     return exprval_call(ctx, &ref, DISPATCH_METHOD | DISPATCH_JSCRIPT_CALLEREXECSSOURCE,
-            argn, stack_args(ctx, argn), do_ret ? &frame->ret : NULL);
+            argn, stack_args(ctx, argn), do_ret ? &ctx->acc : NULL);
 }
 
 /* ECMA-262 3rd Edition    11.1.1 */
@@ -1451,19 +1451,45 @@ static HRESULT interp_new_obj(script_ctx_t *ctx)
 /* ECMA-262 3rd Edition    11.1.5 */
 static HRESULT interp_obj_prop(script_ctx_t *ctx)
 {
-    const BSTR name = get_op_bstr(ctx, 0);
+    jsstr_t *name_arg = get_op_str(ctx, 0);
+    unsigned type = get_op_uint(ctx, 1);
+    const WCHAR *name;
     jsdisp_t *obj;
     jsval_t val;
     HRESULT hres;
 
-    TRACE("%s\n", debugstr_w(name));
+    TRACE("%s\n", debugstr_jsstr(name_arg));
 
     val = stack_pop(ctx);
+
+    /* FIXME: we should pass it as jsstr_t */
+    name = jsstr_flatten(name_arg);
 
     assert(is_object_instance(stack_top(ctx)));
     obj = as_jsdisp(get_object(stack_top(ctx)));
 
-    hres = jsdisp_propput_name(obj, name, val);
+    if(type == PROPERTY_DEFINITION_VALUE) {
+        hres = jsdisp_propput_name(obj, name, val);
+    }else {
+        property_desc_t desc = {PROPF_ENUMERABLE | PROPF_CONFIGURABLE};
+        jsdisp_t *func;
+
+        assert(is_object_instance(val));
+        func = iface_to_jsdisp(get_object(val));
+
+        desc.mask = desc.flags;
+        if(type == PROPERTY_DEFINITION_GETTER) {
+            desc.explicit_getter = TRUE;
+            desc.getter = func;
+        }else {
+            desc.explicit_setter = TRUE;
+            desc.setter = func;
+        }
+
+        hres = jsdisp_define_property(obj, name, &desc);
+        jsdisp_release(func);
+    }
+
     jsval_release(val);
     return hres;
 }
@@ -2605,16 +2631,15 @@ static HRESULT interp_setret(script_ctx_t *ctx)
     return S_OK;
 }
 
-static HRESULT interp_push_ret(script_ctx_t *ctx)
+static HRESULT interp_push_acc(script_ctx_t *ctx)
 {
-    call_frame_t *frame = ctx->call_ctx;
     HRESULT hres;
 
     TRACE("\n");
 
-    hres = stack_push(ctx, frame->ret);
+    hres = stack_push(ctx, ctx->acc);
     if(SUCCEEDED(hres))
-        frame->ret = jsval_undefined();
+        ctx->acc = jsval_undefined();
     return hres;
 }
 
@@ -2801,8 +2826,8 @@ static HRESULT enter_bytecode(script_ctx_t *ctx, jsval_t *r)
             assert(frame->scope == frame->base_scope);
 
             if(return_to_interp) {
-                clear_ret(frame->prev_frame);
-                frame->prev_frame->ret = steal_ret(frame);
+                jsval_release(ctx->acc);
+                ctx->acc = steal_ret(frame);
             }else if(r) {
                 *r = steal_ret(frame);
             }

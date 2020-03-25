@@ -27,6 +27,7 @@
 
 /* Bitmaps */
 #define IDB_REACTOS                 131
+#define IDB_LINEBAR                 138
 #define IDB_SHELL_IEXPLORE_LG       204
 #define IDB_SHELL_IEXPLORE_LG_HOT   205
 #define IDB_SHELL_IEXPLORE_SM       206
@@ -139,6 +140,7 @@
 #define IDS_CANTEJECTMEDIA        158
 #define IDS_CANTSHOWPROPERTIES    159
 #define IDS_CANTDISCONNECT        160
+#define IDS_NONE                  161
 
 /* Friendly File Type Names */
 #define IDS_DIRECTORY             200
@@ -184,6 +186,11 @@
 #define IDS_RUNDLG_BROWSE_CAPTION 182
 #define IDS_RUNDLG_BROWSE_FILTER  183
 
+/* Format Dialog strings */
+#define IDS_FORMAT_TITLE          184
+#define IDS_FORMAT_WARNING        185
+#define IDS_FORMAT_COMPLETE       186
+
 #define IDS_UNKNOWN_APP     190
 #define IDS_EXE_DESCRIPTION 191
 
@@ -193,6 +200,7 @@
 #define IDS_EDIT_VERB    303
 #define IDS_FIND_VERB    304
 #define IDS_PRINT_VERB   305
+#define IDS_CMD_VERB     306
 
 #define IDS_FILE_FOLDER          308
 #define IDS_CREATELINK           309
@@ -209,7 +217,7 @@
 #define IDS_DESCRIPTION          331
 #define IDS_COPY_OF              332
 
-/* Strings for file operations*/
+/* Strings for file operations */
 #define IDS_FILEOOP_COPYING      333
 #define IDS_FILEOOP_MOVING       334
 #define IDS_FILEOOP_DELETING     335
@@ -219,6 +227,18 @@
 
 #define IDS_EJECT                339
 #define IDS_DISCONNECT           340
+
+#define IDS_OPENFILELOCATION     341
+#define IDS_DESKLINK             342
+#define IDS_SENDTO_MENU          343
+
+#define IDS_MOVEERRORTITLE       344
+#define IDS_COPYERRORTITLE       345
+#define IDS_MOVEERRORSAMEFOLDER  346
+#define IDS_MOVEERRORSAME        347
+#define IDS_COPYERRORSAME        348
+#define IDS_MOVEERRORSUBFOLDER   349
+#define IDS_COPYERRORSUBFOLDER   350
 
 #define IDS_MENU_EMPTY           34561
 
@@ -289,13 +309,15 @@
 #define IDC_RUNDLG_LABEL       12305
 
 /* ShellAbout dialog */
-#define IDD_ABOUT              2
-#define IDC_ABOUT_ICON         0x3009
-#define IDC_ABOUT_APPNAME      0x3500
-#define IDC_ABOUT_OTHERSTUFF   0x350D
-#define IDC_ABOUT_REG_USERNAME 0x3507
-#define IDC_ABOUT_REG_ORGNAME  0x3508
-#define IDC_ABOUT_PHYSMEM      0x3503
+#define IDD_ABOUT                     2
+#define IDC_ABOUT_ICON                0x3009
+#define IDC_ABOUT_APPNAME             0x3500
+#define IDS_ABOUT_VERSION_STRING      0x3501
+#define IDC_ABOUT_VERSION             0x3502
+#define IDC_ABOUT_OTHERSTUFF          0x350D
+#define IDC_ABOUT_REG_USERNAME        0x3507
+#define IDC_ABOUT_REG_ORGNAME         0x3508
+#define IDC_ABOUT_PHYSMEM             0x3503
 
 /* About authors dialog */
 #define IDD_ABOUT_AUTHORS         3
@@ -804,3 +826,5 @@
 #define IDR_REBARBANDSITE       154
 #define IDR_USERNOTIFICATION    155
 #define IDR_SHELL               156
+#define IDR_ACTIVEDESKTOP       157
+#define IDR_SENDTOMENU          158

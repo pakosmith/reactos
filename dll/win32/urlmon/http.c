@@ -32,7 +32,7 @@ WINE_DEFAULT_DEBUG_CHANNEL(urlmon);
 typedef struct {
     Protocol base;
 
-    IUnknown            IUnknown_outer;
+    IUnknown            IUnknown_inner;
     IInternetProtocolEx IInternetProtocolEx_iface;
     IInternetPriority   IInternetPriority_iface;
     IWinInetHttpInfo    IWinInetHttpInfo_iface;
@@ -47,7 +47,7 @@ typedef struct {
 
 static inline HttpProtocol *impl_from_IUnknown(IUnknown *iface)
 {
-    return CONTAINING_RECORD(iface, HttpProtocol, IUnknown_outer);
+    return CONTAINING_RECORD(iface, HttpProtocol, IUnknown_inner);
 }
 
 static inline HttpProtocol *impl_from_IInternetProtocolEx(IInternetProtocolEx *iface)
@@ -246,7 +246,7 @@ static ULONG send_http_request(HttpProtocol *This)
     BOOL res;
 
     send_buffer.lpcszHeader = This->full_header;
-    send_buffer.dwHeadersLength = send_buffer.dwHeadersTotal = strlenW(This->full_header);
+    send_buffer.dwHeadersLength = send_buffer.dwHeadersTotal = lstrlenW(This->full_header);
 
     if(This->base.bind_info.dwBindVerb != BINDVERB_GET) {
         switch(This->base.bind_info.stgmedData.tymed) {
@@ -342,7 +342,7 @@ static HRESULT HttpProtocol_open_request(Protocol *prot, IUri *uri, DWORD reques
         CoTaskMemFree(rootdoc_url);
     }
 
-    num = sizeof(accept_mimes)/sizeof(accept_mimes[0])-1;
+    num = ARRAY_SIZE(accept_mimes) - 1;
     hres = IInternetBindInfo_GetBindString(bind_info, BINDSTRING_ACCEPT_MIMES, accept_mimes, num, &num);
     if(hres == INET_E_USE_DEFAULT_SETTING) {
         static const WCHAR default_accept_mimeW[] = {'*','/','*',0};
@@ -408,7 +408,7 @@ static HRESULT HttpProtocol_open_request(Protocol *prot, IUri *uri, DWORD reques
         return hres;
     }
 
-    len = addl_header ? strlenW(addl_header) : 0;
+    len = addl_header ? lstrlenW(addl_header) : 0;
 
     This->full_header = heap_alloc(len*sizeof(WCHAR)+sizeof(default_headersW));
     if(!This->full_header) {
@@ -428,7 +428,7 @@ static HRESULT HttpProtocol_open_request(Protocol *prot, IUri *uri, DWORD reques
         WARN("IServiceProvider_QueryService IID_IHttpNegotiate2 failed: %08x\n", hres);
         /* No goto done as per native */
     }else {
-        len = sizeof(security_id)/sizeof(security_id[0]);
+        len = ARRAY_SIZE(security_id);
         hres = IHttpNegotiate2_GetRootSecurityId(http_negotiate2, security_id, &len, 0);
         IHttpNegotiate2_Release(http_negotiate2);
         if (hres != S_OK)
@@ -561,7 +561,7 @@ static HRESULT HttpProtocol_start_downloading(Protocol *prot)
     content_type = query_http_info(This, HTTP_QUERY_CONTENT_TYPE);
     if(content_type) {
         /* remove the charset, if present */
-        LPWSTR p = strchrW(content_type, ';');
+        LPWSTR p = wcschr(content_type, ';');
         if (p) *p = '\0';
 
         IInternetProtocolSink_ReportProgress(This->base.protocol_sink,
@@ -579,7 +579,7 @@ static HRESULT HttpProtocol_start_downloading(Protocol *prot)
 
     content_length = query_http_info(This, HTTP_QUERY_CONTENT_LENGTH);
     if(content_length) {
-        This->base.content_length = atoiW(content_length);
+        This->base.content_length = wcstol(content_length, NULL, 10);
         heap_free(content_length);
     }
 
@@ -637,7 +637,7 @@ static HRESULT WINAPI HttpProtocolUnk_QueryInterface(IUnknown *iface, REFIID rii
 
     if(IsEqualGUID(&IID_IUnknown, riid)) {
         TRACE("(%p)->(IID_IUnknown %p)\n", This, ppv);
-        *ppv = &This->IUnknown_outer;
+        *ppv = &This->IUnknown_inner;
     }else if(IsEqualGUID(&IID_IInternetProtocolRoot, riid)) {
         TRACE("(%p)->(IID_IInternetProtocolRoot %p)\n", This, ppv);
         *ppv = &This->IInternetProtocolEx_iface;
@@ -967,16 +967,16 @@ static HRESULT create_http_protocol(BOOL https, IUnknown *outer, void **ppobj)
         return E_OUTOFMEMORY;
 
     ret->base.vtbl = &AsyncProtocolVtbl;
-    ret->IUnknown_outer.lpVtbl            = &HttpProtocolUnkVtbl;
+    ret->IUnknown_inner.lpVtbl            = &HttpProtocolUnkVtbl;
     ret->IInternetProtocolEx_iface.lpVtbl = &HttpProtocolVtbl;
     ret->IInternetPriority_iface.lpVtbl   = &HttpPriorityVtbl;
     ret->IWinInetHttpInfo_iface.lpVtbl    = &WinInetHttpInfoVtbl;
 
     ret->https = https;
     ret->ref = 1;
-    ret->outer = outer ? outer : &ret->IUnknown_outer;
+    ret->outer = outer ? outer : &ret->IUnknown_inner;
 
-    *ppobj = &ret->IUnknown_outer;
+    *ppobj = &ret->IUnknown_inner;
 
     URLMON_LockModule();
     return S_OK;

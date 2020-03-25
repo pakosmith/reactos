@@ -1,38 +1,9 @@
 #pragma once
 
-typedef struct _INBV_PROGRESS_STATE
-{
-    ULONG Floor;
-    ULONG Ceiling;
-    ULONG Bias;
-} INBV_PROGRESS_STATE;
-
-typedef struct _BT_PROGRESS_INDICATOR
-{
-    ULONG Count;
-    ULONG Expected;
-    ULONG Percentage;
-} BT_PROGRESS_INDICATOR, *PBT_PROGRESS_INDICATOR;
-
-typedef enum _ROT_BAR_TYPE
-{
-    RB_UNSPECIFIED,
-    RB_SQUARE_CELLS,
-    RB_PROGRESS_BAR
-} ROT_BAR_TYPE;
-
-VOID
-NTAPI
-InbvUpdateProgressBar(
-    IN ULONG Progress
-);
-
-VOID
-NTAPI
-InbvRotBarInit(
-    VOID
-);
-
+//
+// Driver Initialization
+//
+INIT_FUNCTION
 BOOLEAN
 NTAPI
 InbvDriverInitialize(
@@ -40,29 +11,7 @@ InbvDriverInitialize(
     IN ULONG Count
 );
 
-VOID
-NTAPI
-InbvEnableBootDriver(
-    IN BOOLEAN Enable
-);
-
-VOID
-NTAPI
-DisplayBootBitmap(
-    IN BOOLEAN TextMode
-);
-
-VOID
-NTAPI
-DisplayFilter(
-    IN PCHAR *String
-);
-
-VOID
-NTAPI
-FinalizeBootLogo(
-    VOID
-);
+extern BOOLEAN InbvBootDriverInstalled;
 
 PUCHAR
 NTAPI
@@ -78,17 +27,76 @@ InbvBitBlt(
     IN ULONG Y
 );
 
+//
+// Progress-Bar Functions
+//
+INIT_FUNCTION
 VOID
 NTAPI
 InbvIndicateProgress(
     VOID
 );
 
+INIT_FUNCTION
+VOID
+NTAPI
+InbvSetProgressBarSubset(
+    _In_ ULONG Floor,
+    _In_ ULONG Ceiling
+);
+
+INIT_FUNCTION
+VOID
+NTAPI
+InbvUpdateProgressBar(
+    IN ULONG Progress
+);
+
+//
+// Boot Splash-Screen Functions
+//
+INIT_FUNCTION
+VOID
+NTAPI
+InbvRotBarInit(
+    VOID
+);
+
+INIT_FUNCTION
+VOID
+NTAPI
+DisplayBootBitmap(
+    IN BOOLEAN TextMode
+);
+
+INIT_FUNCTION
+VOID
+NTAPI
+DisplayFilter(
+    IN PCHAR *String
+);
+
+INIT_FUNCTION
+VOID
+NTAPI
+FinalizeBootLogo(
+    VOID
+);
+
+//
+// Headless Terminal Support Functions
+//
 VOID
 NTAPI
 InbvPortEnableFifo(
     IN ULONG PortId,
     IN BOOLEAN Enable
+);
+
+BOOLEAN
+NTAPI
+InbvPortPollOnly(
+    IN ULONG PortId
 );
 
 BOOLEAN
@@ -120,11 +128,3 @@ InbvPortInitialize(
     OUT PULONG PortId,
     IN BOOLEAN IsMMIODevice
 );
-
-BOOLEAN
-NTAPI
-InbvPortPollOnly(
-    IN ULONG PortId
-);
-
-extern BOOLEAN InbvBootDriverInstalled;

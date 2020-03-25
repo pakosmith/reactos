@@ -24,8 +24,9 @@ extern ERESOURCE SepSubjectContextLock;
 
 /* PRIVATE FUNCTIONS **********************************************************/
 
-static BOOLEAN
+static
 INIT_FUNCTION
+BOOLEAN
 SepInitExports(VOID)
 {
     SepExports.SeCreateTokenPrivilege = SeCreateTokenPrivilege;
@@ -89,14 +90,14 @@ SepInitExports(VOID)
 }
 
 
+INIT_FUNCTION
 BOOLEAN
 NTAPI
-INIT_FUNCTION
 SepInitializationPhase0(VOID)
 {
     PAGED_CODE();
 
-    ExpInitLuid();
+    if (!ExLuidInitialization()) return FALSE;
     if (!SepInitSecurityIDs()) return FALSE;
     if (!SepInitDACLs()) return FALSE;
     if (!SepInitSDs()) return FALSE;
@@ -124,9 +125,9 @@ SepInitializationPhase0(VOID)
     return TRUE;
 }
 
+INIT_FUNCTION
 BOOLEAN
 NTAPI
-INIT_FUNCTION
 SepInitializationPhase1(VOID)
 {
     OBJECT_ATTRIBUTES ObjectAttributes;
@@ -232,9 +233,9 @@ SepInitializationPhase1(VOID)
     return TRUE;
 }
 
+INIT_FUNCTION
 BOOLEAN
 NTAPI
-INIT_FUNCTION
 SeInitSystem(VOID)
 {
     /* Check the initialization phase */

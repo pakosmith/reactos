@@ -2,9 +2,6 @@
 spec2def(advapi32.dll advapi32.spec ADD_IMPORTLIB)
 add_definitions(-D_ADVAPI32_)
 
-remove_definitions(-D_WIN32_WINNT=0x502)
-add_definitions(-D_WIN32_WINNT=0x600)
-
 include_directories(
     ${REACTOS_SOURCE_DIR}/sdk/include/reactos/idl
     ${REACTOS_SOURCE_DIR}/sdk/include/reactos/drivers/ksecdd
@@ -49,7 +46,7 @@ list(APPEND SOURCE
     wine/security.c
     advapi32.h)
 
-add_library(advapi32 SHARED
+add_library(advapi32 MODULE
     ${SOURCE}
     advapi32.rc
     ${CMAKE_CURRENT_BINARY_DIR}/advapi32_stubs.c

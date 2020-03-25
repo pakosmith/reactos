@@ -170,8 +170,8 @@ static void add_fav_to_menu(HMENU favmenu, HMENU menu, LPWSTR title, LPCWSTR url
 
 static void add_favs_to_menu(HMENU favmenu, HMENU menu, LPCWSTR dir)
 {
+    static const WCHAR search[] = {'*',0};
     WCHAR path[MAX_PATH*2];
-    const WCHAR search[] = {'*',0};
     WCHAR* filename;
     HANDLE findhandle;
     WIN32_FIND_DATAW finddata;
@@ -202,9 +202,9 @@ static void add_favs_to_menu(HMENU favmenu, HMENU menu, LPCWSTR dir)
 
             if(finddata.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
             {
+                static const WCHAR ignore1[] = {'.','.',0};
+                static const WCHAR ignore2[] = {'.',0};
                 MENUITEMINFOW item;
-                const WCHAR ignore1[] = {'.','.',0};
-                const WCHAR ignore2[] = {'.',0};
 
                 if(!lstrcmpW(filename, ignore1) || !lstrcmpW(filename, ignore2))
                     continue;
@@ -217,9 +217,9 @@ static void add_favs_to_menu(HMENU favmenu, HMENU menu, LPCWSTR dir)
                 add_favs_to_menu(favmenu, item.hSubMenu, path);
             } else
             {
+                static const WCHAR urlext[] = {'.','u','r','l',0};
                 WCHAR* fileext;
                 WCHAR* url = NULL;
-                const WCHAR urlext[] = {'.','u','r','l',0};
 
                 if(lstrcmpiW(PathFindExtensionW(filename), urlext))
                     continue;
@@ -250,18 +250,18 @@ static void add_favs_to_menu(HMENU favmenu, HMENU menu, LPCWSTR dir)
 
 static void add_tbs_to_menu(HMENU menu)
 {
+    static const WCHAR toolbar_key[] = {'S','o','f','t','w','a','r','e','\\',
+                                        'M','i','c','r','o','s','o','f','t','\\',
+                                        'I','n','t','e','r','n','e','t',' ',
+                                        'E','x','p','l','o','r','e','r','\\',
+                                        'T','o','o','l','b','a','r',0};
     HUSKEY toolbar_handle;
-    WCHAR toolbar_key[] = {'S','o','f','t','w','a','r','e','\\',
-                           'M','i','c','r','o','s','o','f','t','\\',
-                           'I','n','t','e','r','n','e','t',' ',
-                           'E','x','p','l','o','r','e','r','\\',
-                           'T','o','o','l','b','a','r',0};
 
     if(SHRegOpenUSKeyW(toolbar_key, KEY_READ, NULL, &toolbar_handle, TRUE) == ERROR_SUCCESS)
     {
+        static const WCHAR classes_key[] = {'S','o','f','t','w','a','r','e','\\',
+                                            'C','l','a','s','s','e','s','\\','C','L','S','I','D',0};
         HUSKEY classes_handle;
-        WCHAR classes_key[] = {'S','o','f','t','w','a','r','e','\\',
-                               'C','l','a','s','s','e','s','\\','C','L','S','I','D',0};
         WCHAR guid[39];
         DWORD value_len = ARRAY_SIZE(guid);
         int i;
@@ -970,7 +970,7 @@ static BOOL create_ie_window(BOOL nohome, const WCHAR *cmdline)
         VARIANT var_url;
         int cmdlen;
 
-        cmdlen = strlenW(cmdline);
+        cmdlen = lstrlenW(cmdline);
         if(cmdlen > 2 && cmdline[0] == '"' && cmdline[cmdlen-1] == '"') {
             cmdline++;
             cmdlen -= 2;
@@ -1001,18 +1001,18 @@ static HDDEDATA open_dde_url(WCHAR *dde_url)
     url = dde_url;
     if(*url == '"') {
         url++;
-        url_end = strchrW(url, '"');
+        url_end = wcschr(url, '"');
         if(!url_end) {
             FIXME("missing string terminator\n");
             return 0;
         }
         *url_end = 0;
     }else {
-        url_end = strchrW(url, ',');
+        url_end = wcschr(url, ',');
         if(url_end)
             *url_end = 0;
         else
-            url_end = url + strlenW(url);
+            url_end = url + lstrlenW(url);
     }
 
     LIST_FOR_EACH_ENTRY(iter, &ie_list, InternetExplorer, entry) {
@@ -1162,11 +1162,11 @@ DWORD WINAPI IEWinMain(const WCHAR *cmdline, int nShowWindow)
 
         while (cmdline[length] && cmdline[length] != ' ' && cmdline[length] != '\t') length++;
 
-        if (!strncmpiW(cmdline, embeddingW, length))
+        if (!_wcsnicmp(cmdline, embeddingW, length))
             embedding = TRUE;
-        else if (!strncmpiW(cmdline, nohomeW, length))
+        else if (!_wcsnicmp(cmdline, nohomeW, length))
             nohome = TRUE;
-        else if (!strncmpiW(cmdline, startmanagerW, length))
+        else if (!_wcsnicmp(cmdline, startmanagerW, length))
             manager = TRUE;
         else
             break;

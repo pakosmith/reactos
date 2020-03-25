@@ -19,8 +19,9 @@ INT cmdContinue(INT argc, WCHAR **argv)
 
     if (argc != 3)
     {
-        ConResPuts(StdOut, IDS_GENERIC_SYNTAX);
-        ConResPuts(StdOut, IDS_CONTINUE_SYNTAX);
+        PrintMessageString(4381);
+        ConPuts(StdOut, L"\n");
+        PrintNetMessage(MSG_CONTINUE_SYNTAX);
         return 1;
     }
 
@@ -28,11 +29,10 @@ INT cmdContinue(INT argc, WCHAR **argv)
     {
         if (_wcsicmp(argv[i], L"/help") == 0)
         {
-            ConResPuts(StdOut, IDS_GENERIC_SYNTAX);
-            ConResPuts(StdOut, IDS_CONTINUE_SYNTAX);
-            ConResPuts(StdOut, IDS_CONTINUE_HELP_1);
-            ConResPuts(StdOut, IDS_CONTINUE_HELP_2);
-            ConResPuts(StdOut, IDS_GENERIC_PAGE);
+            PrintMessageString(4381);
+            ConPuts(StdOut, L"\n");
+            PrintNetMessage(MSG_CONTINUE_SYNTAX);
+            PrintNetMessage(MSG_CONTINUE_HELP);
             return 1;
         }
     }

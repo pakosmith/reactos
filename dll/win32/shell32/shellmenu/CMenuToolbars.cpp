@@ -28,9 +28,6 @@
 
 #define IDS_MENU_EMPTY 34561
 
-#define GET_X_LPARAM(lp) ((int)(short)LOWORD(lp))
-#define GET_Y_LPARAM(lp) ((int)(short)HIWORD(lp))
-
 WINE_DEFAULT_DEBUG_CHANNEL(CMenuToolbars);
 
 // FIXME: Enable if/when wine comctl supports this flag properly
@@ -953,7 +950,7 @@ HRESULT CMenuToolbarBase::KeyboardItemChange(DWORD dwSelectType)
                     {
                         HWND tlw;
                         m_menuBand->_GetTopLevelWindow(&tlw);
-                        SendMessageW(tlw, WM_CANCELMODE, 0, 0);
+                        ::SendMessageW(tlw, WM_CANCELMODE, 0, 0);
                         PostMessageW(WM_USER_CHANGETRACKEDITEM, index, MAKELPARAM(m_isTrackingPopup, FALSE));
                     }
                     else

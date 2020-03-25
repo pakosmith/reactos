@@ -90,7 +90,7 @@ static int alloced_bstrs_count;
 
 static BSTR _bstr_(const char *str)
 {
-    assert(alloced_bstrs_count < sizeof(alloced_bstrs)/sizeof(alloced_bstrs[0]));
+    assert(alloced_bstrs_count < ARRAY_SIZE(alloced_bstrs));
     alloced_bstrs[alloced_bstrs_count] = alloc_str_from_narrow(str);
     return alloced_bstrs[alloced_bstrs_count++];
 }
@@ -144,7 +144,7 @@ static void test_saxstr(const char *file, unsigned line, BSTR str, const char *e
     /* exit earlier on length mismatch */
     if (lenexp != len) return;
 
-    MultiByteToWideChar(CP_ACP, 0, expected, -1, buf, sizeof(buf)/sizeof(WCHAR));
+    MultiByteToWideChar(CP_ACP, 0, expected, -1, buf, ARRAY_SIZE(buf));
 
     cmp = memcmp(str, buf, lenexp*sizeof(WCHAR));
     if (cmp && todo)
@@ -1162,6 +1162,9 @@ static HRESULT WINAPI contentHandler_startPrefixMapping(
 {
     struct call_entry call;
 
+    ok(prefix != NULL, "prefix == NULL\n");
+    ok(uri != NULL, "uri == NULL\n");
+
     init_call_entry(locator, &call);
     call.id = CH_STARTPREFIXMAPPING;
     call.arg1W = SysAllocStringLen(prefix, prefix_len);
@@ -1176,6 +1179,8 @@ static HRESULT WINAPI contentHandler_endPrefixMapping(
         const WCHAR *prefix, int len)
 {
     struct call_entry call;
+
+    ok(prefix != NULL, "prefix == NULL\n");
 
     init_call_entry(locator, &call);
     call.id = CH_ENDPREFIXMAPPING;
@@ -1196,6 +1201,10 @@ static HRESULT WINAPI contentHandler_startElement(
     IMXAttributes *mxattr;
     HRESULT hr;
     int len;
+
+    ok(uri != NULL, "uri == NULL\n");
+    ok(localname != NULL, "localname == NULL\n");
+    ok(qname != NULL, "qname == NULL\n");
 
     hr = ISAXAttributes_QueryInterface(saxattr, &IID_IMXAttributes, (void**)&mxattr);
     EXPECT_HR(hr, E_NOINTERFACE);
@@ -1272,6 +1281,10 @@ static HRESULT WINAPI contentHandler_endElement(
 {
     struct call_entry call;
 
+    ok(uri != NULL, "uri == NULL\n");
+    ok(localname != NULL, "localname == NULL\n");
+    ok(qname != NULL, "qname == NULL\n");
+
     init_call_entry(locator, &call);
     call.id = CH_ENDELEMENT;
     call.arg1W = SysAllocStringLen(uri, uri_len);
@@ -1289,6 +1302,8 @@ static HRESULT WINAPI contentHandler_characters(
 {
     struct call_entry call;
 
+    ok(chars != NULL, "chars == NULL\n");
+
     init_call_entry(locator, &call);
     call.id = CH_CHARACTERS;
     call.arg1W = SysAllocStringLen(chars, len);
@@ -1302,6 +1317,8 @@ static HRESULT WINAPI contentHandler_ignorableWhitespace(
         const WCHAR *chars, int len)
 {
     struct call_entry call;
+
+    ok(chars != NULL, "chars == NULL\n");
 
     init_call_entry(locator, &call);
     call.id = CH_IGNORABLEWHITESPACE;
@@ -1318,6 +1335,9 @@ static HRESULT WINAPI contentHandler_processingInstruction(
 {
     struct call_entry call;
 
+    ok(target != NULL, "target == NULL\n");
+    ok(data != NULL, "data == NULL\n");
+
     init_call_entry(locator, &call);
     call.id = CH_PROCESSINGINSTRUCTION;
     call.arg1W = SysAllocStringLen(target, target_len);
@@ -1332,6 +1352,8 @@ static HRESULT WINAPI contentHandler_skippedEntity(
         const WCHAR *name, int len)
 {
     struct call_entry call;
+
+    ok(name != NULL, "name == NULL\n");
 
     init_call_entry(locator, &call);
     call.id = CH_SKIPPEDENTITY;
@@ -2952,7 +2974,7 @@ static void test_mxwriter_handlers(void)
 
     EXPECT_REF(writer, 1);
 
-    for (i = 0; i < sizeof(riids)/sizeof(REFIID); i++)
+    for (i = 0; i < ARRAY_SIZE(riids); i++)
     {
         IUnknown *handler;
         IMXWriter *writer2;
@@ -3950,10 +3972,13 @@ static const struct writer_characters_t writer_characters[] = {
 static void test_mxwriter_characters(void)
 {
     static const WCHAR chardataW[] = {'T','E','S','T','C','H','A','R','D','A','T','A',' ','.',0};
+    static const WCHAR embedded_nullbytes[] = {'a',0,'b',0,0,0,'c',0};
     const struct writer_characters_t *table = writer_characters;
+    IVBSAXContentHandler *vb_content;
     ISAXContentHandler *content;
     IMXWriter *writer;
     VARIANT dest;
+    BSTR str;
     HRESULT hr;
     int i = 0;
 
@@ -3962,6 +3987,9 @@ static void test_mxwriter_characters(void)
     EXPECT_HR(hr, S_OK);
 
     hr = IMXWriter_QueryInterface(writer, &IID_ISAXContentHandler, (void**)&content);
+    EXPECT_HR(hr, S_OK);
+
+    hr = IMXWriter_QueryInterface(writer, &IID_IVBSAXContentHandler, (void**)&vb_content);
     EXPECT_HR(hr, S_OK);
 
     hr = IMXWriter_put_omitXMLDeclaration(writer, VARIANT_TRUE);
@@ -3976,20 +4004,25 @@ static void test_mxwriter_characters(void)
     hr = ISAXContentHandler_characters(content, chardataW, 0);
     EXPECT_HR(hr, S_OK);
 
-    hr = ISAXContentHandler_characters(content, chardataW, sizeof(chardataW)/sizeof(WCHAR) - 1);
+    str = _bstr_("VbChars");
+    hr = IVBSAXContentHandler_characters(vb_content, &str);
+    EXPECT_HR(hr, S_OK);
+
+    hr = ISAXContentHandler_characters(content, chardataW, ARRAY_SIZE(chardataW) - 1);
     EXPECT_HR(hr, S_OK);
 
     V_VT(&dest) = VT_EMPTY;
     hr = IMXWriter_get_output(writer, &dest);
     EXPECT_HR(hr, S_OK);
     ok(V_VT(&dest) == VT_BSTR, "got %d\n", V_VT(&dest));
-    ok(!lstrcmpW(_bstr_("TESTCHARDATA ."), V_BSTR(&dest)), "got wrong content %s\n", wine_dbgstr_w(V_BSTR(&dest)));
+    ok(!lstrcmpW(_bstr_("VbCharsTESTCHARDATA ."), V_BSTR(&dest)), "got wrong content %s\n", wine_dbgstr_w(V_BSTR(&dest)));
     VariantClear(&dest);
 
     hr = ISAXContentHandler_endDocument(content);
     EXPECT_HR(hr, S_OK);
 
     ISAXContentHandler_Release(content);
+    IVBSAXContentHandler_Release(vb_content);
     IMXWriter_Release(writer);
 
     /* try empty characters data to see if element is closed */
@@ -4023,6 +4056,65 @@ static void test_mxwriter_characters(void)
     VariantClear(&dest);
 
     ISAXContentHandler_Release(content);
+    IMXWriter_Release(writer);
+
+    /* test embedded null bytes */
+    hr = CoCreateInstance(&CLSID_MXXMLWriter, NULL, CLSCTX_INPROC_SERVER,
+            &IID_IMXWriter, (void**)&writer);
+    EXPECT_HR(hr, S_OK);
+
+    hr = IMXWriter_QueryInterface(writer, &IID_ISAXContentHandler, (void**)&content);
+    EXPECT_HR(hr, S_OK);
+
+    hr = IMXWriter_put_omitXMLDeclaration(writer, VARIANT_TRUE);
+    EXPECT_HR(hr, S_OK);
+
+    hr = ISAXContentHandler_startDocument(content);
+    EXPECT_HR(hr, S_OK);
+
+    hr = ISAXContentHandler_characters(content, embedded_nullbytes, ARRAY_SIZE(embedded_nullbytes));
+    EXPECT_HR(hr, S_OK);
+
+    V_VT(&dest) = VT_EMPTY;
+    hr = IMXWriter_get_output(writer, &dest);
+    EXPECT_HR(hr, S_OK);
+    ok(V_VT(&dest) == VT_BSTR, "got %d\n", V_VT(&dest));
+    ok(SysStringLen(V_BSTR(&dest)) == ARRAY_SIZE(embedded_nullbytes), "unexpected len %d\n", SysStringLen(V_BSTR(&dest)));
+    ok(!memcmp(V_BSTR(&dest), embedded_nullbytes, ARRAY_SIZE(embedded_nullbytes)),
+       "got wrong content %s\n", wine_dbgstr_w(V_BSTR(&dest)));
+    VariantClear(&dest);
+
+    ISAXContentHandler_Release(content);
+    IMXWriter_Release(writer);
+
+    hr = CoCreateInstance(&CLSID_MXXMLWriter, NULL, CLSCTX_INPROC_SERVER,
+            &IID_IMXWriter, (void**)&writer);
+    EXPECT_HR(hr, S_OK);
+
+    hr = IMXWriter_QueryInterface(writer, &IID_IVBSAXContentHandler, (void**)&vb_content);
+    EXPECT_HR(hr, S_OK);
+
+    hr = IMXWriter_put_omitXMLDeclaration(writer, VARIANT_TRUE);
+    EXPECT_HR(hr, S_OK);
+
+    hr = IVBSAXContentHandler_startDocument(vb_content);
+    EXPECT_HR(hr, S_OK);
+
+    str = SysAllocStringLen(embedded_nullbytes, ARRAY_SIZE(embedded_nullbytes));
+    hr = IVBSAXContentHandler_characters(vb_content, &str);
+    EXPECT_HR(hr, S_OK);
+    SysFreeString(str);
+
+    V_VT(&dest) = VT_EMPTY;
+    hr = IMXWriter_get_output(writer, &dest);
+    EXPECT_HR(hr, S_OK);
+    ok(V_VT(&dest) == VT_BSTR, "got %d\n", V_VT(&dest));
+    ok(SysStringLen(V_BSTR(&dest)) == ARRAY_SIZE(embedded_nullbytes), "unexpected len %d\n", SysStringLen(V_BSTR(&dest)));
+    ok(!memcmp(V_BSTR(&dest), embedded_nullbytes, ARRAY_SIZE(embedded_nullbytes)),
+       "got wrong content %s\n", wine_dbgstr_w(V_BSTR(&dest)));
+    VariantClear(&dest);
+
+    IVBSAXContentHandler_Release(vb_content);
     IMXWriter_Release(writer);
 
     /* batch tests */
@@ -4166,7 +4258,7 @@ static void test_mxwriter_stream(void)
     IStream *stream;
     LARGE_INTEGER pos;
     ULARGE_INTEGER pos2;
-    DWORD test_count = sizeof(mxwriter_stream_tests)/sizeof(mxwriter_stream_tests[0]);
+    DWORD test_count = ARRAY_SIZE(mxwriter_stream_tests);
 
     for(current_stream_test_index = 0; current_stream_test_index < test_count; ++current_stream_test_index) {
         const mxwriter_stream_test *test = mxwriter_stream_tests+current_stream_test_index;
@@ -4640,7 +4732,7 @@ static void test_mxwriter_comment(void)
     ok(!lstrcmpW(_bstr_("<!---->\r\n"), V_BSTR(&dest)), "got wrong content %s\n", wine_dbgstr_w(V_BSTR(&dest)));
     VariantClear(&dest);
 
-    hr = ISAXLexicalHandler_comment(lexical, commentW, sizeof(commentW)/sizeof(WCHAR)-1);
+    hr = ISAXLexicalHandler_comment(lexical, commentW, ARRAY_SIZE(commentW) - 1);
     EXPECT_HR(hr, S_OK);
 
     V_VT(&dest) = VT_EMPTY;
@@ -4865,16 +4957,16 @@ static void test_mxwriter_dtd(void)
     hr = IVBSAXLexicalHandler_startDTD(vblexical, NULL, NULL, NULL);
     EXPECT_HR(hr, E_POINTER);
 
-    hr = ISAXLexicalHandler_startDTD(lexical, NULL, 0, pubW, sizeof(pubW)/sizeof(WCHAR), NULL, 0);
+    hr = ISAXLexicalHandler_startDTD(lexical, NULL, 0, pubW, ARRAY_SIZE(pubW), NULL, 0);
     EXPECT_HR(hr, E_INVALIDARG);
 
-    hr = ISAXLexicalHandler_startDTD(lexical, NULL, 0, NULL, 0, sysW, sizeof(sysW)/sizeof(WCHAR));
+    hr = ISAXLexicalHandler_startDTD(lexical, NULL, 0, NULL, 0, sysW, ARRAY_SIZE(sysW));
     EXPECT_HR(hr, E_INVALIDARG);
 
-    hr = ISAXLexicalHandler_startDTD(lexical, NULL, 0, pubW, sizeof(pubW)/sizeof(WCHAR), sysW, sizeof(sysW)/sizeof(WCHAR));
+    hr = ISAXLexicalHandler_startDTD(lexical, NULL, 0, pubW, ARRAY_SIZE(pubW), sysW, ARRAY_SIZE(sysW));
     EXPECT_HR(hr, E_INVALIDARG);
 
-    hr = ISAXLexicalHandler_startDTD(lexical, nameW, sizeof(nameW)/sizeof(WCHAR), NULL, 0, NULL, 0);
+    hr = ISAXLexicalHandler_startDTD(lexical, nameW, ARRAY_SIZE(nameW), NULL, 0, NULL, 0);
     EXPECT_HR(hr, S_OK);
 
     V_VT(&dest) = VT_EMPTY;
@@ -4885,11 +4977,11 @@ static void test_mxwriter_dtd(void)
     VariantClear(&dest);
 
     /* system id is required if public is present */
-    hr = ISAXLexicalHandler_startDTD(lexical, nameW, sizeof(nameW)/sizeof(WCHAR), pubW, sizeof(pubW)/sizeof(WCHAR), NULL, 0);
+    hr = ISAXLexicalHandler_startDTD(lexical, nameW, ARRAY_SIZE(nameW), pubW, ARRAY_SIZE(pubW), NULL, 0);
     EXPECT_HR(hr, E_INVALIDARG);
 
-    hr = ISAXLexicalHandler_startDTD(lexical, nameW, sizeof(nameW)/sizeof(WCHAR),
-        pubW, sizeof(pubW)/sizeof(WCHAR), sysW, sizeof(sysW)/sizeof(WCHAR));
+    hr = ISAXLexicalHandler_startDTD(lexical, nameW, ARRAY_SIZE(nameW),
+        pubW, ARRAY_SIZE(pubW), sysW, ARRAY_SIZE(sysW));
     EXPECT_HR(hr, S_OK);
 
     V_VT(&dest) = VT_EMPTY;
@@ -4926,10 +5018,10 @@ static void test_mxwriter_dtd(void)
     hr = IVBSAXDeclHandler_elementDecl(vbdecl, NULL, NULL);
     EXPECT_HR(hr, E_POINTER);
 
-    hr = ISAXDeclHandler_elementDecl(decl, nameW, sizeof(nameW)/sizeof(WCHAR), NULL, 0);
+    hr = ISAXDeclHandler_elementDecl(decl, nameW, ARRAY_SIZE(nameW), NULL, 0);
     EXPECT_HR(hr, E_INVALIDARG);
 
-    hr = ISAXDeclHandler_elementDecl(decl, nameW, sizeof(nameW)/sizeof(WCHAR), contentW, sizeof(contentW)/sizeof(WCHAR));
+    hr = ISAXDeclHandler_elementDecl(decl, nameW, ARRAY_SIZE(nameW), contentW, ARRAY_SIZE(contentW));
     EXPECT_HR(hr, S_OK);
 
     V_VT(&dest) = VT_EMPTY;
@@ -4944,7 +5036,7 @@ static void test_mxwriter_dtd(void)
     hr = IMXWriter_put_output(writer, dest);
     EXPECT_HR(hr, S_OK);
 
-    hr = ISAXDeclHandler_elementDecl(decl, nameW, sizeof(nameW)/sizeof(WCHAR), contentW, 0);
+    hr = ISAXDeclHandler_elementDecl(decl, nameW, ARRAY_SIZE(nameW), contentW, 0);
     EXPECT_HR(hr, S_OK);
 
     V_VT(&dest) = VT_EMPTY;

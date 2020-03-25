@@ -25,6 +25,7 @@
 #ifdef __REACTOS__
 
 #include <k32.h>
+#include "japanese.h"   /* Japanese eras */
 
 #define NDEBUG
 #include <debug.h>
@@ -33,6 +34,12 @@ DEBUG_CHANNEL(nls);
 #define CRITICAL_SECTION RTL_CRITICAL_SECTION
 #define CRITICAL_SECTION_DEBUG RTL_CRITICAL_SECTION_DEBUG
 #define CALINFO_MAX_YEAR 2029
+
+#define IS_LCID_JAPANESE(lcid) PRIMARYLANGID(LANGIDFROMLCID(lcid)) == LANG_JAPANESE
+
+#ifndef CAL_SABBREVERASTRING
+    #define CAL_SABBREVERASTRING 0x00000039
+#endif
 
 #else /* __REACTOS__ */
 
@@ -124,7 +131,7 @@ static DWORD NLS_GetLocaleNumber(LCID lcid, DWORD dwFlags)
   DWORD dwVal = 0;
 
   szBuff[0] = '\0';
-  GetLocaleInfoW(lcid, dwFlags, szBuff, sizeof(szBuff) / sizeof(WCHAR));
+  GetLocaleInfoW(lcid, dwFlags, szBuff, ARRAY_SIZE(szBuff));
 
   if (szBuff[0] && szBuff[1] == ';' && szBuff[2] != '0')
     dwVal = (szBuff[0] - '0') * 10 + (szBuff[2] - '0');
@@ -149,7 +156,7 @@ static WCHAR* NLS_GetLocaleString(LCID lcid, DWORD dwFlags)
   DWORD dwLen;
 
   szBuff[0] = '\0';
-  GetLocaleInfoW(lcid, dwFlags, szBuff, sizeof(szBuff) / sizeof(WCHAR));
+  GetLocaleInfoW(lcid, dwFlags, szBuff, ARRAY_SIZE(szBuff));
   dwLen = strlenW(szBuff) + 1;
   str = HeapAlloc(GetProcessHeap(), 0, dwLen * sizeof(WCHAR));
   if (str)
@@ -278,7 +285,7 @@ static const NLS_FORMAT_NODE *NLS_GetFormats(LCID lcid, DWORD dwFlags)
     GET_LOCALE_STRING(new_node->cyfmt.lpCurrencySymbol, LOCALE_SCURRENCY);
 
     /* Date/Time Format info, negative character, etc */
-    for (i = 0; i < sizeof(NLS_LocaleIndices)/sizeof(NLS_LocaleIndices[0]); i++)
+    for (i = 0; i < ARRAY_SIZE(NLS_LocaleIndices); i++)
     {
       GET_LOCALE_STRING(new_node->lppszStrings[i], NLS_LocaleIndices[i]);
     }
@@ -322,7 +329,7 @@ static const NLS_FORMAT_NODE *NLS_GetFormats(LCID lcid, DWORD dwFlags)
       /* We raced and lost: The node was already added by another thread.
        * node points to the currently cached node, so free new_node.
        */
-      for (i = 0; i < sizeof(NLS_LocaleIndices)/sizeof(NLS_LocaleIndices[0]); i++)
+      for (i = 0; i < ARRAY_SIZE(NLS_LocaleIndices); i++)
         HeapFree(GetProcessHeap(), 0, new_node->lppszStrings[i]);
       HeapFree(GetProcessHeap(), 0, new_node->fmt.lpDecimalSep);
       HeapFree(GetProcessHeap(), 0, new_node->fmt.lpThousandSep);
@@ -372,7 +379,11 @@ BOOL NLS_IsUnicodeOnlyLcid(LCID lcid)
 #define IsTimeFmtChar(p)   (p == 'H'||p == 'h'||p == 'm'||p == 's'||p == 't')
 
 /* Only the following flags can be given if a date/time format is specified */
+#ifdef __REACTOS__
+#define DATE_FORMAT_FLAGS (DATE_DATEVARSONLY | DATE_USE_ALT_CALENDAR)
+#else
 #define DATE_FORMAT_FLAGS (DATE_DATEVARSONLY)
+#endif
 #define TIME_FORMAT_FLAGS (TIME_TIMEVARSONLY|TIME_FORCE24HOURFORMAT| \
                            TIME_NOMINUTESORSECONDS|TIME_NOSECONDS| \
                            TIME_NOTIMEMARKER)
@@ -604,6 +615,32 @@ static INT NLS_GetDateTimeFormatW(LCID lcid, DWORD dwFlags,
         break;
 
       case 'y':
+#ifdef __REACTOS__
+        if (IS_LCID_JAPANESE(lcid) && (dwFlags & DATE_USE_ALT_CALENDAR))
+        {
+            PCJAPANESE_ERA pEra = JapaneseEra_Find(lpTime);
+            if (pEra)
+            {
+                if (count >= 2)
+                {
+                    count = 2;
+                }
+
+                dwVal = lpTime->wYear - pEra->wYear + 1;
+
+                if (dwVal == 1 && JapaneseEra_IsFirstYearGannen())
+                {
+                    // Gan of 'Gannen'
+                    buff[0] = 0x5143;
+                    buff[1] = 0;
+                }
+                szAdd = buff;
+                break;
+            }
+            SetLastError(ERROR_INVALID_PARAMETER);
+            return 0;
+        }
+#endif
         if (count >= 4)
         {
           count = 4;
@@ -618,6 +655,32 @@ static INT NLS_GetDateTimeFormatW(LCID lcid, DWORD dwFlags,
         break;
 
       case 'g':
+#ifdef __REACTOS__
+        if (IS_LCID_JAPANESE(lcid))
+        {
+            if (dwFlags & DATE_USE_ALT_CALENDAR)
+            {
+                PCJAPANESE_ERA pEra = JapaneseEra_Find(lpTime);
+                if (pEra)
+                {
+                    RtlStringCbCopyW(buff, sizeof(buff), pEra->szEraName);
+                    szAdd = buff;
+                    break;
+                }
+                SetLastError(ERROR_INVALID_PARAMETER);
+                return 0;
+            }
+            else
+            {
+                /* Seireki */
+                buff[0] = 0x897F;
+                buff[1] = 0x66A6;
+                buff[2] = 0;
+                szAdd = buff;
+                break;
+            }
+        }
+#endif
         if (count == 2)
         {
           /* FIXME: Our GetCalendarInfo() does not yet support CAL_SERASTRING.
@@ -697,7 +760,7 @@ static INT NLS_GetDateTimeFormatW(LCID lcid, DWORD dwFlags,
       {
         static const WCHAR fmtW[] = {'%','.','*','d',0};
         /* We have a numeric value to add */
-        snprintfW(buff, sizeof(buff)/sizeof(WCHAR), fmtW, count, dwVal);
+        snprintfW(buff, ARRAY_SIZE(buff), fmtW, count, dwVal);
       }
 
       dwLen = szAdd ? strlenW(szAdd) : 0;
@@ -793,10 +856,10 @@ static INT NLS_GetDateTimeFormatA(LCID lcid, DWORD dwFlags,
   }
 
   if (lpFormat)
-    MultiByteToWideChar(cp, 0, lpFormat, -1, szFormat, sizeof(szFormat)/sizeof(WCHAR));
+    MultiByteToWideChar(cp, 0, lpFormat, -1, szFormat, ARRAY_SIZE(szFormat));
 
-  if (cchOut > (int)(sizeof(szOut)/sizeof(WCHAR)))
-    cchOut = sizeof(szOut)/sizeof(WCHAR);
+  if (cchOut > (int) ARRAY_SIZE(szOut))
+    cchOut = ARRAY_SIZE(szOut);
 
   szOut[0] = '\0';
 
@@ -866,7 +929,7 @@ INT WINAPI GetDateFormatA( LCID lcid, DWORD dwFlags, const SYSTEMTIME* lpTime,
                                 lpFormat, lpDateStr, cchOut);
 }
 
-#ifndef __REACTOS__
+#if _WIN32_WINNT >= 0x600
 /******************************************************************************
  * GetDateFormatEx [KERNEL32.@]
  *
@@ -906,7 +969,7 @@ INT WINAPI GetDateFormatEx(LPCWSTR localename, DWORD flags,
                                 flags | DATE_DATEVARSONLY, date, format,
                                 outbuf, bufsize);
 }
-#endif /* !__REACTOS__ */
+#endif /* _WIN32_WINNT >= 0x600 */
 
 /******************************************************************************
  * GetDateFormatW	[KERNEL32.@]
@@ -974,7 +1037,7 @@ INT WINAPI GetTimeFormatA(LCID lcid, DWORD dwFlags, const SYSTEMTIME* lpTime,
                                 lpFormat, lpTimeStr, cchOut);
 }
 
-#ifndef __REACTOS__
+#if _WIN32_WINNT >= 0x600
 /******************************************************************************
  * GetTimeFormatEx [KERNEL32.@]
  *
@@ -1006,7 +1069,7 @@ INT WINAPI GetTimeFormatEx(LPCWSTR localename, DWORD flags,
                                 flags | TIME_TIMEVARSONLY, time, format,
                                 outbuf, bufsize);
 }
-#endif /* !__REACTOS__ */
+#endif /* _WIN32_WINNT >= 0x600 */
 
 /******************************************************************************
  *		GetTimeFormatW	[KERNEL32.@]
@@ -1087,21 +1150,21 @@ INT WINAPI GetNumberFormatA(LCID lcid, DWORD dwFlags,
     pfmt = &fmt;
     if (lpFormat->lpDecimalSep)
     {
-      MultiByteToWideChar(cp, 0, lpFormat->lpDecimalSep, -1, szDec, sizeof(szDec)/sizeof(WCHAR));
+      MultiByteToWideChar(cp, 0, lpFormat->lpDecimalSep, -1, szDec, ARRAY_SIZE(szDec));
       fmt.lpDecimalSep = szDec;
     }
     if (lpFormat->lpThousandSep)
     {
-      MultiByteToWideChar(cp, 0, lpFormat->lpThousandSep, -1, szGrp, sizeof(szGrp)/sizeof(WCHAR));
+      MultiByteToWideChar(cp, 0, lpFormat->lpThousandSep, -1, szGrp, ARRAY_SIZE(szGrp));
       fmt.lpThousandSep = szGrp;
     }
   }
 
   if (lpszValue)
-    MultiByteToWideChar(cp, 0, lpszValue, -1, szIn, sizeof(szIn)/sizeof(WCHAR));
+    MultiByteToWideChar(cp, 0, lpszValue, -1, szIn, ARRAY_SIZE(szIn));
 
-  if (cchOut > (int)(sizeof(szOut)/sizeof(WCHAR)))
-    cchOut = sizeof(szOut)/sizeof(WCHAR);
+  if (cchOut > (int) ARRAY_SIZE(szOut))
+    cchOut = ARRAY_SIZE(szOut);
 
   szOut[0] = '\0';
 
@@ -1136,7 +1199,7 @@ INT WINAPI GetNumberFormatW(LCID lcid, DWORD dwFlags,
                             LPCWSTR lpszValue,  const NUMBERFMTW *lpFormat,
                             LPWSTR lpNumberStr, int cchOut)
 {
-  WCHAR szBuff[128], *szOut = szBuff + sizeof(szBuff) / sizeof(WCHAR) - 1;
+  WCHAR szBuff[128], *szOut = szBuff + ARRAY_SIZE(szBuff) - 1;
   WCHAR szNegBuff[8];
   const WCHAR *lpszNeg = NULL, *lpszNegStart, *szSrc;
   DWORD dwState = 0, dwDecimals = 0, dwGroupCount = 0, dwCurrentGroupCount = 0;
@@ -1164,7 +1227,7 @@ INT WINAPI GetNumberFormatW(LCID lcid, DWORD dwFlags,
   else
   {
     GetLocaleInfoW(lcid, LOCALE_SNEGATIVESIGN|(dwFlags & LOCALE_NOUSEROVERRIDE),
-                   szNegBuff, sizeof(szNegBuff)/sizeof(WCHAR));
+                   szNegBuff, ARRAY_SIZE(szNegBuff));
     lpszNegStart = lpszNeg = szNegBuff;
   }
   lpszNeg = lpszNeg + strlenW(lpszNeg) - 1;
@@ -1368,7 +1431,7 @@ error:
   return 0;
 }
 
-#ifndef __REACTOS__
+#if _WIN32_WINNT >= 0x600
 /**************************************************************************
  *              GetNumberFormatEx	(KERNEL32.@)
  */
@@ -1387,7 +1450,7 @@ INT WINAPI GetNumberFormatEx(LPCWSTR name, DWORD flags,
 
   return GetNumberFormatW(lcid, flags, value, format, number, numout);
 }
-#endif /* !__REACTOS__ */
+#endif /* _WIN32_WINNT >= 0x600 */
 
 /**************************************************************************
  *              GetCurrencyFormatA	(KERNEL32.@)
@@ -1453,26 +1516,26 @@ INT WINAPI GetCurrencyFormatA(LCID lcid, DWORD dwFlags,
     pfmt = &fmt;
     if (lpFormat->lpDecimalSep)
     {
-      MultiByteToWideChar(cp, 0, lpFormat->lpDecimalSep, -1, szDec, sizeof(szDec)/sizeof(WCHAR));
+      MultiByteToWideChar(cp, 0, lpFormat->lpDecimalSep, -1, szDec, ARRAY_SIZE(szDec));
       fmt.lpDecimalSep = szDec;
     }
     if (lpFormat->lpThousandSep)
     {
-      MultiByteToWideChar(cp, 0, lpFormat->lpThousandSep, -1, szGrp, sizeof(szGrp)/sizeof(WCHAR));
+      MultiByteToWideChar(cp, 0, lpFormat->lpThousandSep, -1, szGrp, ARRAY_SIZE(szGrp));
       fmt.lpThousandSep = szGrp;
     }
     if (lpFormat->lpCurrencySymbol)
     {
-      MultiByteToWideChar(cp, 0, lpFormat->lpCurrencySymbol, -1, szCy, sizeof(szCy)/sizeof(WCHAR));
+      MultiByteToWideChar(cp, 0, lpFormat->lpCurrencySymbol, -1, szCy, ARRAY_SIZE(szCy));
       fmt.lpCurrencySymbol = szCy;
     }
   }
 
   if (lpszValue)
-    MultiByteToWideChar(cp, 0, lpszValue, -1, szIn, sizeof(szIn)/sizeof(WCHAR));
+    MultiByteToWideChar(cp, 0, lpszValue, -1, szIn, ARRAY_SIZE(szIn));
 
-  if (cchOut > (int)(sizeof(szOut)/sizeof(WCHAR)))
-    cchOut = sizeof(szOut)/sizeof(WCHAR);
+  if (cchOut > (int) ARRAY_SIZE(szOut))
+    cchOut = ARRAY_SIZE(szOut);
 
   szOut[0] = '\0';
 
@@ -1528,7 +1591,7 @@ INT WINAPI GetCurrencyFormatW(LCID lcid, DWORD dwFlags,
     CF_CY_LEFT|CF_CY_SPACE,  /* $ 1.1 */
     CF_CY_RIGHT|CF_CY_SPACE, /* 1.1 $ */
   };
-  WCHAR szBuff[128], *szOut = szBuff + sizeof(szBuff) / sizeof(WCHAR) - 1;
+  WCHAR szBuff[128], *szOut = szBuff + ARRAY_SIZE(szBuff) - 1;
   WCHAR szNegBuff[8];
   const WCHAR *lpszNeg = NULL, *lpszNegStart, *szSrc, *lpszCy, *lpszCyStart;
   DWORD dwState = 0, dwDecimals = 0, dwGroupCount = 0, dwCurrentGroupCount = 0, dwFmt;
@@ -1559,7 +1622,7 @@ INT WINAPI GetCurrencyFormatW(LCID lcid, DWORD dwFlags,
   else
   {
     GetLocaleInfoW(lcid, LOCALE_SNEGATIVESIGN|(dwFlags & LOCALE_NOUSEROVERRIDE),
-                   szNegBuff, sizeof(szNegBuff)/sizeof(WCHAR));
+                   szNegBuff, ARRAY_SIZE(szNegBuff));
     lpszNegStart = lpszNeg = szNegBuff;
   }
   dwFlags &= (LOCALE_NOUSEROVERRIDE|LOCALE_USE_CP_ACP);
@@ -1782,6 +1845,21 @@ error:
   return 0;
 }
 
+#if _WIN32_WINNT >= 0x600
+/***********************************************************************
+ *            GetCurrencyFormatEx (KERNEL32.@)
+ */
+int WINAPI GetCurrencyFormatEx(LPCWSTR localename, DWORD flags, LPCWSTR value,
+                                const CURRENCYFMTW *format, LPWSTR str, int len)
+{
+    TRACE("(%s,0x%08x,%s,%p,%p,%d)\n", debugstr_w(localename), flags,
+            debugstr_w(value), format, str, len);
+
+    return GetCurrencyFormatW( LocaleNameToLCID(localename, 0), flags, value, format, str, len);
+}
+#endif
+
+
 /* FIXME: Everything below here needs to move somewhere else along with the
  *        other EnumXXX functions, when a method for storing resources for
  *        alternate calendars is determined.
@@ -1854,9 +1932,9 @@ static BOOL NLS_EnumDateFormats(const struct enumdateformats_context *ctxt)
 
     lctype |= ctxt->flags & LOCALE_USE_CP_ACP;
     if (ctxt->unicode)
-        ret = GetLocaleInfoW(ctxt->lcid, lctype, bufW, sizeof(bufW)/sizeof(bufW[0]));
+        ret = GetLocaleInfoW(ctxt->lcid, lctype, bufW, ARRAY_SIZE(bufW));
     else
-        ret = GetLocaleInfoA(ctxt->lcid, lctype, bufA, sizeof(bufA)/sizeof(bufA[0]));
+        ret = GetLocaleInfoA(ctxt->lcid, lctype, bufA, ARRAY_SIZE(bufA));
 
     if (ret)
     {
@@ -1949,7 +2027,7 @@ BOOL WINAPI EnumDateFormatsW(DATEFMT_ENUMPROCW proc, LCID lcid, DWORD flags)
     return NLS_EnumDateFormats(&ctxt);
 }
 
-#ifndef __REACTOS__
+#if _WIN32_WINNT >= 0x600
 /**************************************************************************
  *              EnumDateFormatsExEx	(KERNEL32.@)
  */
@@ -1966,7 +2044,7 @@ BOOL WINAPI EnumDateFormatsExEx(DATEFMT_ENUMPROCEXEX proc, const WCHAR *locale, 
 
     return NLS_EnumDateFormats(&ctxt);
 }
-#endif /* !__REACTOS__ */
+#endif /* _WIN32_WINNT >= 0x600 */
 
 struct enumtimeformats_context {
     enum enum_callback_type type;  /* callback kind */
@@ -2009,9 +2087,9 @@ static BOOL NLS_EnumTimeFormats(struct enumtimeformats_context *ctxt)
 
     lctype |= ctxt->flags & LOCALE_USE_CP_ACP;
     if (ctxt->unicode)
-        ret = GetLocaleInfoW(ctxt->lcid, lctype, bufW, sizeof(bufW)/sizeof(bufW[0]));
+        ret = GetLocaleInfoW(ctxt->lcid, lctype, bufW, ARRAY_SIZE(bufW));
     else
-        ret = GetLocaleInfoA(ctxt->lcid, lctype, bufA, sizeof(bufA)/sizeof(bufA[0]));
+        ret = GetLocaleInfoA(ctxt->lcid, lctype, bufA, ARRAY_SIZE(bufA));
 
     if (ret)
     {
@@ -2073,7 +2151,7 @@ BOOL WINAPI EnumTimeFormatsW(TIMEFMT_ENUMPROCW proc, LCID lcid, DWORD flags)
     return NLS_EnumTimeFormats(&ctxt);
 }
 
-#ifndef __REACTOS__
+#if _WIN32_WINNT >= 0x600
 /**************************************************************************
  *              EnumTimeFormatsEx	(KERNEL32.@)
  */
@@ -2090,7 +2168,7 @@ BOOL WINAPI EnumTimeFormatsEx(TIMEFMT_ENUMPROCEX proc, const WCHAR *locale, DWOR
 
     return NLS_EnumTimeFormats(&ctxt);
 }
-#endif /* !__REACTOS__ */
+#endif /* _WIN32_WINNT >= 0x600 */
 
 struct enumcalendar_context {
     enum enum_callback_type type;  /* callback kind */
@@ -2321,7 +2399,7 @@ BOOL WINAPI EnumCalendarInfoExW( CALINFO_ENUMPROCEXW calinfoproc,LCID locale,
   return NLS_EnumCalendarInfo(&ctxt);
 }
 
-#ifndef __REACTOS__
+#if _WIN32_WINNT >= 0x600
 /******************************************************************************
  *		EnumCalendarInfoExEx	[KERNEL32.@]
  */
@@ -2341,7 +2419,7 @@ BOOL WINAPI EnumCalendarInfoExEx( CALINFO_ENUMPROCEXEX calinfoproc, LPCWSTR loca
   ctxt.unicode = TRUE;
   return NLS_EnumCalendarInfo(&ctxt);
 }
-#endif /* !__REACTOS__ */
+#endif /* _WIN32_WINNT >= 0x600 */
 
 /*********************************************************************
  *	GetCalendarInfoA				(KERNEL32.@)
@@ -2352,6 +2430,26 @@ int WINAPI GetCalendarInfoA(LCID lcid, CALID Calendar, CALTYPE CalType,
 {
     int ret, cchDataW = cchData;
     LPWSTR lpCalDataW = NULL;
+#ifdef __REACTOS__
+    DWORD cp = CP_ACP;
+    if (!(CalType & CAL_USE_CP_ACP))
+    {
+        DWORD dwFlags = ((CalType & CAL_NOUSEROVERRIDE) ? LOCALE_NOUSEROVERRIDE : 0);
+        const NLS_FORMAT_NODE *node = NLS_GetFormats(lcid, dwFlags);
+        if (!node)
+        {
+            SetLastError(ERROR_INVALID_PARAMETER);
+            return 0;
+        }
+        cp = node->dwCodePage;
+    }
+    if ((CalType & 0xFFFF) == CAL_SABBREVERASTRING)
+    {
+        /* NOTE: CAL_SABBREVERASTRING is not supported in GetCalendarInfoA */
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return 0;
+    }
+#endif
 
     if (NLS_IsUnicodeOnlyLcid(lcid))
     {
@@ -2366,7 +2464,11 @@ int WINAPI GetCalendarInfoA(LCID lcid, CALID Calendar, CALTYPE CalType,
 
     ret = GetCalendarInfoW(lcid, Calendar, CalType, lpCalDataW, cchDataW, lpValue);
     if(ret && lpCalDataW && lpCalData)
+#ifdef __REACTOS__
+        ret = WideCharToMultiByte(cp, 0, lpCalDataW, -1, lpCalData, cchData, NULL, NULL);
+#else
         ret = WideCharToMultiByte(CP_ACP, 0, lpCalDataW, -1, lpCalData, cchData, NULL, NULL);
+#endif
     else if (CalType & CAL_RETURN_NUMBER)
         ret *= sizeof(WCHAR);
     HeapFree(GetProcessHeap(), 0, lpCalDataW);
@@ -2480,18 +2582,101 @@ int WINAPI GetCalendarInfoW(LCID Locale, CALID Calendar, CALTYPE CalType,
 
     switch (calinfo) {
 	case CAL_ICALINTVALUE:
+#ifdef __REACTOS__
+        if (IS_LCID_JAPANESE(Locale))
+        {
+            if (CalType & CAL_RETURN_NUMBER)
+            {
+                *lpValue = CAL_JAPAN;
+                return sizeof(DWORD) / sizeof(WCHAR);
+            }
+            else
+            {
+                static const WCHAR fmtW[] = {'%','u',0};
+                WCHAR buffer[10];
+                int ret = snprintfW( buffer, 10, fmtW, CAL_JAPAN ) + 1;
+                if (!lpCalData) return ret;
+                if (ret <= cchData)
+                {
+                    strcpyW( lpCalData, buffer );
+                    return ret;
+                }
+                SetLastError( ERROR_INSUFFICIENT_BUFFER );
+                return 0;
+            }
+        }
+#endif
             if (CalType & CAL_RETURN_NUMBER)
                 return GetLocaleInfoW(Locale, LOCALE_RETURN_NUMBER | LOCALE_ICALENDARTYPE,
                         (LPWSTR)lpValue, 2);
             return GetLocaleInfoW(Locale, LOCALE_ICALENDARTYPE, lpCalData, cchData);
 	case CAL_SCALNAME:
+#ifdef __REACTOS__
+        if (IS_LCID_JAPANESE(Locale) && Calendar == CAL_JAPAN)
+        {
+            // Wareki
+            lpCalData[0] = 0x548C;
+            lpCalData[1] = 0x66A6;
+            lpCalData[2] = 0;
+            return 3;
+        }
+#endif
             FIXME("Unimplemented caltype %d\n", calinfo);
             if (lpCalData) *lpCalData = 0;
 	    return 1;
 	case CAL_IYEAROFFSETRANGE:
+#ifdef __REACTOS__
+        if (IS_LCID_JAPANESE(Locale) && Calendar == CAL_JAPAN)
+        {
+            PCJAPANESE_ERA pEra = JapaneseEra_Find(NULL);
+            if (pEra)
+            {
+                if (CalType & CAL_RETURN_NUMBER)
+                {
+                    *lpValue = pEra->wYear;
+                    return sizeof(DWORD) / sizeof(WCHAR);
+                }
+                else
+                {
+                    static const WCHAR fmtW[] = {'%','u',0};
+                    WCHAR buffer[10];
+                    int ret = snprintfW( buffer, 10, fmtW, pEra->wYear ) + 1;
+                    if (!lpCalData) return ret;
+                    if (ret <= cchData)
+                    {
+                        strcpyW( lpCalData, buffer );
+                        return ret;
+                    }
+                    SetLastError( ERROR_INSUFFICIENT_BUFFER );
+                    return 0;
+                }
+            }
+            else
+            {
+                SetLastError(ERROR_INVALID_PARAMETER);
+                return 0;
+            }
+        }
+#endif
             FIXME("Unimplemented caltype %d\n", calinfo);
 	    return 0;
 	case CAL_SERASTRING:
+#ifdef __REACTOS__
+        if (IS_LCID_JAPANESE(Locale) && Calendar == CAL_JAPAN)
+        {
+            PCJAPANESE_ERA pEra = JapaneseEra_Find(NULL);
+            if (pEra)
+            {
+                RtlStringCchCopyW(lpCalData, cchData, pEra->szEraName);
+                return strlenW(lpCalData) + 1;
+            }
+            else
+            {
+                SetLastError(ERROR_INVALID_PARAMETER);
+                return 0;
+            }
+        }
+#endif
             FIXME("Unimplemented caltype %d\n", calinfo);
 	    return 0;
 	case CAL_SSHORTDATE:
@@ -2539,6 +2724,30 @@ int WINAPI GetCalendarInfoW(LCID Locale, CALID Calendar, CALTYPE CalType,
 	case CAL_SYEARMONTH:
             return GetLocaleInfoW(Locale, caltype_lctype_map[calinfo] | localeflags, lpCalData, cchData);
 	case CAL_ITWODIGITYEARMAX:
+#ifdef __REACTOS__
+        if (IS_LCID_JAPANESE(Locale) && Calendar == CAL_JAPAN)
+        {
+            if (CalType & CAL_RETURN_NUMBER)
+            {
+                *lpValue = JAPANESE_MAX_TWODIGITYEAR;
+                return sizeof(DWORD) / sizeof(WCHAR);
+            }
+            else
+            {
+                static const WCHAR fmtW[] = {'%','u',0};
+                WCHAR buffer[10];
+                int ret = snprintfW( buffer, 10, fmtW, JAPANESE_MAX_TWODIGITYEAR ) + 1;
+                if (!lpCalData) return ret;
+                if (ret <= cchData)
+                {
+                    strcpyW( lpCalData, buffer );
+                    return ret;
+                }
+                SetLastError( ERROR_INSUFFICIENT_BUFFER );
+                return 0;
+            }
+        }
+#endif
             if (CalType & CAL_RETURN_NUMBER)
             {
                 *lpValue = CALINFO_MAX_YEAR;
@@ -2559,6 +2768,20 @@ int WINAPI GetCalendarInfoW(LCID Locale, CALID Calendar, CALTYPE CalType,
                 return 0;
             }
 	    break;
+#ifdef __REACTOS__
+    case CAL_SABBREVERASTRING:
+        if (IS_LCID_JAPANESE(Locale) && Calendar == CAL_JAPAN)
+        {
+            PCJAPANESE_ERA pEra = JapaneseEra_Find(NULL);
+            if (pEra)
+            {
+                RtlStringCchCopyW(lpCalData, cchData, pEra->szEraAbbrev);
+                return strlenW(lpCalData) + 1;
+            }
+        }
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return 0;
+#endif
 	default:
             FIXME("Unknown caltype %d\n", calinfo);
             SetLastError(ERROR_INVALID_FLAGS);
@@ -2566,6 +2789,23 @@ int WINAPI GetCalendarInfoW(LCID Locale, CALID Calendar, CALTYPE CalType,
     }
     return 0;
 }
+
+#if _WIN32_WINNT >= 0x600
+/*********************************************************************
+ *	GetCalendarInfoEx				(KERNEL32.@)
+ */
+int WINAPI GetCalendarInfoEx(LPCWSTR locale, CALID calendar, LPCWSTR lpReserved, CALTYPE caltype,
+    LPWSTR data, int len, DWORD *value)
+{
+    static int once;
+
+    LCID lcid = LocaleNameToLCID(locale, 0);
+    if (!once++)
+        FIXME("(%s, %d, %p, 0x%08x, %p, %d, %p): semi-stub\n", debugstr_w(locale), calendar, lpReserved, caltype,
+        data, len, value);
+    return GetCalendarInfoW(lcid, calendar, caltype, data, len, value);
+}
+#endif
 
 /*********************************************************************
  *	SetCalendarInfoA				(KERNEL32.@)

@@ -17,8 +17,10 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#include "config.h"
-#include "wine/port.h"
+#ifdef __REACTOS__
+#include <wine/config.h>
+#include <wine/port.h>
+#endif
 
 #include <math.h>
 #include <limits.h>
@@ -522,7 +524,7 @@ static const builtin_prop_t Math_props[] = {
 static const builtin_info_t Math_info = {
     JSCLASS_MATH,
     {NULL, NULL, 0},
-    sizeof(Math_props)/sizeof(*Math_props),
+    ARRAY_SIZE(Math_props),
     Math_props,
     NULL,
     NULL
@@ -558,7 +560,7 @@ HRESULT create_math(script_ctx_t *ctx, jsdisp_t **ret)
         return hres;
     }
 
-    for(i=0; i < sizeof(constants)/sizeof(*constants); i++) {
+    for(i=0; i < ARRAY_SIZE(constants); i++) {
         hres = jsdisp_define_data_property(math, constants[i].name, 0,
                                            jsval_number(constants[i].val));
         if(FAILED(hres)) {

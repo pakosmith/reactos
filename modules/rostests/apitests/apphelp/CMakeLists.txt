@@ -1,7 +1,16 @@
 project(appcompat)
-add_definitions(-D__ROS_LONG64__ -DWINETEST_USE_DBGSTR_LONGLONG)
 
-include_directories(${CMAKE_CURRENT_BINARY_DIR})
+add_definitions(
+    -D__ROS_LONG64__
+    -DWINETEST_USE_DBGSTR_LONGLONG
+    -DUNICODE
+    -D_UNICODE
+    -D_ATL_NO_EXCEPTIONS)
+
+set_cpp(WITH_RUNTIME)
+
+include_directories(${REACTOS_SOURCE_DIR}/sdk/lib/atl
+                    ${CMAKE_CURRENT_BINARY_DIR})
 
 list(APPEND SOURCE
     apphelp.c
@@ -9,6 +18,7 @@ list(APPEND SOURCE
     db.cpp
     env.c
     layerapi.c
+    register.cpp
     testlist.c
     testdata.rc
     testdb.xml)

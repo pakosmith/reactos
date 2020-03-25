@@ -332,7 +332,7 @@ static HRESULT Number_toString(script_ctx_t *ctx, vdisp_t *jsthis, WORD flags, u
                     ch = '-';
                 }
                 else ch = '+';
-                sprintfW(&buf[idx], formatW, ch, (int)log_radix);
+                swprintf(&buf[idx], formatW, ch, (int)log_radix);
             }
         }
         else buf[idx] = '\0';
@@ -524,7 +524,7 @@ static const builtin_prop_t Number_props[] = {
 static const builtin_info_t Number_info = {
     JSCLASS_NUMBER,
     {NULL, NULL,0, Number_get_value},
-    sizeof(Number_props)/sizeof(*Number_props),
+    ARRAY_SIZE(Number_props),
     Number_props,
     NULL,
     NULL

@@ -160,6 +160,7 @@ extern "C" {
 #define SHGFI_ADDOVERLAYS	32
 #define SHGFI_OVERLAYINDEX	64
 #define SHGFI_ICON	256
+#define SHGSI_ICON SHGFI_ICON
 #define SHGFI_DISPLAYNAME	512
 #define SHGFI_TYPENAME	1024
 #define SHGFI_ATTRIBUTES	2048
@@ -171,6 +172,7 @@ extern "C" {
 #define SHGFI_ATTR_SPECIFIED 131072
 #define SHGFI_LARGEICON	0
 #define SHGFI_SMALLICON	1
+#define SHGSI_SMALLICON SHGFI_SMALLICON
 #define SHGFI_OPENICON	2
 #define SHGFI_SHELLICONSIZE	4
 #define SHGFI_PIDL	8
@@ -629,6 +631,14 @@ WINAPI
 DoEnvironmentSubstW(
     _Inout_updates_(cchSrc) LPWSTR pszSrc,
     UINT cchSrc);
+
+#if (_WIN32_IE >= 0x0601)
+BOOL
+WINAPI
+SHTestTokenMembership(
+    _In_opt_ HANDLE hToken,
+    _In_ ULONG ulRID);
+#endif
 
 #ifdef UNICODE
 #define NOTIFYICONDATA_V1_SIZE NOTIFYICONDATAW_V1_SIZE

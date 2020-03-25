@@ -230,8 +230,7 @@ CreateCommonFreeLdrSections(
 
     /* Timeout=0 */
     IniCacheInsertKey(BootStore->OptionsIniSection, NULL, INSERT_LAST,
-                      // L"TimeOut", L"0"); // FIXME!! There is a bug in the INI parser where a given key can be inserted twice in the same section...
-                      L"TimeOut", L"10");
+                      L"TimeOut", L"0");
 
     /* Create "Display" section */
     IniSection = IniCacheAppendSection(BootStore->IniCache, L"Display");
@@ -1017,7 +1016,7 @@ AddBootStoreEntry(
     }
     else
     {
-        DPRINT1("Loader type %d is currently unsupported!\n", NtosBootLoaders[BootStore->Type].Type);
+        DPRINT1("Loader type %d is currently unsupported!\n", BootStore->Type);
         return STATUS_NOT_SUPPORTED;
     }
 }
@@ -1151,9 +1150,9 @@ QueryBootStoreOptions(
     //
 
     // if (BootStore->Type >= BldrTypeMax || NtosBootLoaders[BootStore->Type].Type >= BldrTypeMax)
-    if (BootStore->Type != FreeLdr || BootStore->Type != NtLdr)
+    if (BootStore->Type != FreeLdr && BootStore->Type != NtLdr)
     {
-        DPRINT1("Loader type %d is currently unsupported!\n", NtosBootLoaders[BootStore->Type].Type);
+        DPRINT1("Loader type %d is currently unsupported!\n", BootStore->Type);
         return STATUS_NOT_SUPPORTED;
     }
 
@@ -1237,7 +1236,7 @@ SetBootStoreOptions(
 
     RtlStringCchPrintfW(TimeoutStr, ARRAYSIZE(TimeoutStr), L"%d", BootOptions->Timeout);
     IniCacheInsertKey(((PBOOT_STORE_INI_CONTEXT)BootStore)->OptionsIniSection,
-                      NULL, INSERT_LAST,
+                      NULL, INSERT_FIRST, // INSERT_LAST, // FIXME!! There is a bug in the INI parser where a given key can be inserted twice in the same section...
                       L"TimeOut", TimeoutStr);
 
     return STATUS_SUCCESS;

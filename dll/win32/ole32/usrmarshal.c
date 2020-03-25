@@ -35,7 +35,6 @@
 #include "oleauto.h"
 #include "rpcproxy.h"
 
-#include "wine/unicode.h"
 #include "wine/debug.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(ole);
@@ -116,7 +115,7 @@ ULONG __RPC_USER CLIPFORMAT_UserSize(ULONG *pFlags, ULONG size, CLIPFORMAT *pCF)
         /* urg! this function is badly designed because it won't tell us how
          * much space is needed without doing a dummy run of storing the
          * name into a buffer */
-        ret = GetClipboardFormatNameW(*pCF, format, sizeof(format)/sizeof(format[0])-1);
+        ret = GetClipboardFormatNameW(*pCF, format, ARRAY_SIZE(format)-1);
         if (!ret)
             RaiseException(DV_E_CLIPFORMAT, 0, 0, NULL);
         size += (ret + 1) * sizeof(WCHAR);
@@ -161,7 +160,7 @@ unsigned char * __RPC_USER CLIPFORMAT_UserMarshal(ULONG *pFlags, unsigned char *
         *(DWORD *)pBuffer = *pCF;
         pBuffer += 4;
 
-        len = GetClipboardFormatNameW(*pCF, format, sizeof(format)/sizeof(format[0])-1);
+        len = GetClipboardFormatNameW(*pCF, format, ARRAY_SIZE(format)-1);
         if (!len)
             RaiseException(DV_E_CLIPFORMAT, 0, 0, NULL);
         len += 1;
@@ -1716,7 +1715,7 @@ ULONG __RPC_USER STGMEDIUM_UserSize(ULONG *pFlags, ULONG StartingSize, STGMEDIUM
         {
             TRACE("file name is %s\n", debugstr_w(pStgMedium->u.lpszFileName));
             size += 3 * sizeof(DWORD) +
-                (strlenW(pStgMedium->u.lpszFileName) + 1) * sizeof(WCHAR);
+                (lstrlenW(pStgMedium->u.lpszFileName) + 1) * sizeof(WCHAR);
         }
         break;
     case TYMED_ISTREAM:
@@ -1814,7 +1813,7 @@ unsigned char * __RPC_USER STGMEDIUM_UserMarshal(ULONG *pFlags, unsigned char *p
         if (pStgMedium->u.lpszFileName)
         {
             DWORD len;
-            len = strlenW(pStgMedium->u.lpszFileName);
+            len = lstrlenW(pStgMedium->u.lpszFileName);
             /* conformance */
             *(DWORD *)pBuffer = len + 1;
             pBuffer += sizeof(DWORD);
@@ -2036,11 +2035,29 @@ unsigned char * __RPC_USER STGMEDIUM_UserUnmarshal(ULONG *pFlags, unsigned char 
  *  which the first parameter is a ULONG.
  *  This function is only intended to be called by the RPC runtime.
  */
-void __RPC_USER STGMEDIUM_UserFree(ULONG *pFlags, STGMEDIUM *pStgMedium)
+void __RPC_USER STGMEDIUM_UserFree(ULONG *flags, STGMEDIUM *med)
 {
-    TRACE("(%s, %p\n", debugstr_user_flags(pFlags), pStgMedium);
+    TRACE("(%s, %p)\n", debugstr_user_flags(flags), med);
 
-    ReleaseStgMedium(pStgMedium);
+    switch (med->tymed)
+    {
+    case TYMED_NULL:
+    case TYMED_FILE:
+    case TYMED_ISTREAM:
+    case TYMED_ISTORAGE:
+        ReleaseStgMedium(med);
+        break;
+    case TYMED_HGLOBAL:
+    case TYMED_GDI:
+    case TYMED_MFPICT:
+    case TYMED_ENHMF:
+        if (LOWORD(*flags) == MSHCTX_INPROC)
+            med->tymed = TYMED_NULL;
+        ReleaseStgMedium(med);
+        break;
+    default:
+        RaiseException(DV_E_TYMED, 0, 0, NULL);
+    }
 }
 
 ULONG __RPC_USER ASYNC_STGMEDIUM_UserSize(ULONG *pFlags, ULONG StartingSize, ASYNC_STGMEDIUM *pStgMedium)
@@ -2108,7 +2125,7 @@ ULONG __RPC_USER SNB_UserSize(ULONG *pFlags, ULONG StartingSize, SNB *pSnb)
 
         while (*ptrW)
         {
-            size += (strlenW(*ptrW) + 1)*sizeof(WCHAR);
+            size += (lstrlenW(*ptrW) + 1)*sizeof(WCHAR);
             ptrW++;
         }
     }
@@ -2143,7 +2160,7 @@ unsigned char * __RPC_USER SNB_UserMarshal(ULONG *pFlags, unsigned char *pBuffer
 
         while (*ptrW)
         {
-            ULONG len = strlenW(*ptrW) + 1;
+            ULONG len = lstrlenW(*ptrW) + 1;
 
             wire->strcnt++;
             wire->charcnt += len;
@@ -2184,7 +2201,7 @@ unsigned char * __RPC_USER SNB_UserUnmarshal(ULONG *pFlags, unsigned char *pBuff
 
         for (i = 0; i < wire->strcnt; i++)
         {
-            ULONG len = strlenW(src);
+            ULONG len = lstrlenW(src);
             memcpy(dest, src, (len + 1)*sizeof(WCHAR));
             *ptrW = dest;
             src += len + 1;

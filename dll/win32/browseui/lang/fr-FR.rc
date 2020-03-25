@@ -150,6 +150,30 @@ BEGIN
     COMBOBOX IDC_ICONOPTIONS, 52, 18, 123, 57, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
 END
 
+IDD_SEARCH_DLG DIALOGEX 0, 0, 260, 85
+STYLE DS_SHELLFONT | DS_CONTROL | WS_CHILD | WS_VISIBLE | WS_CAPTION | WS_DLGFRAME
+FONT 8, "MS Shell Dlg"
+BEGIN
+    LTEXT "Chercher en fonction d'un ou de tous les critères suivants.", IDC_SEARCH_LABEL, 4, 2, 120, 20
+
+    LTEXT "Tout ou partie du &nom de fichier :", -1, 10, 25, 500, 10
+    EDITTEXT IDC_SEARCH_FILENAME, 10, 35, 100, 12, ES_AUTOHSCROLL | WS_BORDER | WS_TABSTOP
+
+    LTEXT "Un &mot ou une phrase dans le fichier :", -1, 10, 50, 500, 10
+    EDITTEXT IDC_SEARCH_QUERY, 10, 60, 100, 12, ES_AUTOHSCROLL | WS_BORDER | WS_TABSTOP
+
+    LTEXT "&Chercher dans :", -1, 10, 75, 500, 10
+    CONTROL "", IDC_SEARCH_COMBOBOX, WC_COMBOBOXEXW, WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN | WS_TABSTOP | CCS_NODIVIDER | CCS_NOMOVEY | CBS_OWNERDRAWFIXED, 10, 85, 200, 200
+
+    DEFPUSHBUTTON "Che&rcher", IDC_SEARCH_BUTTON, 80, 110, 40, 15, WS_GROUP | WS_TABSTOP | WS_VISIBLE
+    PUSHBUTTON "&Arrêter", IDC_SEARCH_STOP_BUTTON, 80, 110, 40, 15, WS_GROUP | WS_TABSTOP
+
+    AUTOCHECKBOX "Inclure les dossiers et les fichiers cachés",
+                 IDC_SEARCH_HIDDEN, 4, 130, 130, 8, WS_VISIBLE | WS_GROUP | WS_TABSTOP
+
+    CONTROL "", IDC_PROGRESS_BAR, PROGRESS_CLASSA, WS_BORDER | PBS_MARQUEE, 10, 155, 200, 8
+END
+
 /* Accelerators */
 
 IDR_ACCELERATORS ACCELERATORS
@@ -304,6 +328,7 @@ STRINGTABLE
 BEGIN
     IDS_BACK "Retour vers %s"
     IDS_FORWARD "Avancer vers %s"
+    IDS_FOLDER_OPTIONS "Options des dossiers"
 END
 
 STRINGTABLE
@@ -316,4 +341,15 @@ BEGIN
     IDS_BROWSEFORNEWTOOLAR "Choisissez un dossier"
     IDS_TOOLBAR_ERR_TITLE "Barre d'outils"
     IDS_TOOLBAR_ERR_TEXT "Impossible de créer une barre d'outils."
+END
+
+STRINGTABLE
+BEGIN
+    IDS_SEARCHINVALID "'%1' n'est pas un dossier valide."
+    IDS_SEARCH_FOLDER "Recherche de %s en cours"
+    IDS_SEARCH_FILES_FOUND "%u fichiers trouvés"
+    IDS_SEARCH_OPEN_FOLDER "Ouvrir le &dossier parent"
+    IDS_COL_NAME "Nom"
+    IDS_COL_LOCATION "Dans le dossier"
+    IDS_COL_RELEVANCE "Pertinence"
 END

@@ -102,7 +102,7 @@ FONT 8, "MS Shell Dlg"
 BEGIN
     DEFPUSHBUTTON "OK", 1, 60, 175, 60, 15, BS_DEFPUSHBUTTON | WS_GROUP | WS_TABSTOP
     PUSHBUTTON "Loobu", 2, 125, 175, 60, 15, WS_GROUP | WS_TABSTOP
-    LTEXT "", IDC_BROWSE_FOR_FOLDER_TITLE, 4, 4, 180, 12
+    LTEXT "", IDC_BROWSE_FOR_FOLDER_TITLE, 4, 4, 180, 24
     LTEXT "", IDC_BROWSE_FOR_FOLDER_STATUS, 4, 25, 180, 12
     CONTROL "", IDC_BROWSE_FOR_FOLDER_TREEVIEW, "SysTreeView32", TVS_HASBUTTONS | TVS_HASLINES | TVS_LINESATROOT | WS_BORDER | WS_TABSTOP, 4, 40, 180, 120
 END
@@ -142,11 +142,7 @@ FONT 8, "MS Shell Dlg"
 BEGIN
     ICON "", IDC_ABOUT_ICON, 7, 55, 21, 20
     LTEXT "", IDC_ABOUT_APPNAME, 35, 55, 200, 10
-    LTEXT "Versioon ", IDC_STATIC, 35, 65, 28, 10
-    LTEXT KERNEL_VERSION_STR, IDC_STATIC, 63, 65, 27, 10
-    LTEXT " (", IDC_STATIC, 90, 65, 5, 10
-    LTEXT KERNEL_VERSION_BUILD_STR, IDC_STATIC, 95, 65, 58, 10
-    LTEXT ")", IDC_STATIC, 153, 65, 5, 10
+    LTEXT "", IDC_ABOUT_VERSION, 35, 65, 250, 10
     LTEXT "Autoriõigus 1998-", IDC_STATIC, 35, 75, 53, 10
     LTEXT COPYRIGHT_YEAR, IDC_STATIC, 88, 75, 17, 10
     LTEXT " ReactOS Team\0", IDC_STATIC, 105, 75, 53, 10
@@ -175,7 +171,7 @@ CAPTION "Käivitus"
 FONT 8, "MS Shell Dlg"
 BEGIN
     ICON "", IDC_RUNDLG_ICON, 7, 11, 18, 20, WS_VISIBLE
-    LTEXT "Kirjuta programmi, kausta, dokumendi või Interneti-ressursi nimi ja ReactOS avab selle.", 12289, 36, 11, 182, 18
+    LTEXT "Kirjuta programmi, kausta, dokumendi või Interneti-ressursi nimi ja ReactOS avab selle.", 12289, 36, 11, 185, 18
     LTEXT "&Ava:", 12305, 7, 39, 24, 10
     CONTROL "", IDC_RUNDLG_EDITPATH, "COMBOBOX", WS_TABSTOP | WS_GROUP | WS_VSCROLL | WS_VISIBLE | CBS_AUTOHSCROLL | CBS_DROPDOWN, 36, 37, 184, 100
     DEFPUSHBUTTON "OK", IDOK, 36, 70, 59, 14, WS_TABSTOP
@@ -221,8 +217,8 @@ BEGIN
     CHECKBOX "Käivita teistsuguse mandaadiga", IDC_SHORTEX_RUN_DIFFERENT, 25, 50, 150, 10
     LTEXT "Selle suvandi abil saad käivitada otsetee teise või enda kasutajanime all, kaitstes samal ajal oma arvutit ja andmeid volitamata programmitegevuse eest.", -1, 50, 60, 175, 40
     CHECKBOX "Käivita eraldi mäluruumis", IDC_SHORTEX_RUN_SEPARATE, 25, 100, 150, 10, WS_DISABLED
-    PUSHBUTTON "OK", 1, 63, 124, 50, 15, WS_VISIBLE
-    PUSHBUTTON "Loobu", 2, 120, 124, 50, 15, WS_VISIBLE
+    PUSHBUTTON "OK", IDOK, 63, 124, 50, 15, WS_VISIBLE
+    PUSHBUTTON "Loobu", IDCANCEL, 120, 124, 50, 15, WS_VISIBLE
 END
 
 IDD_FOLDER_PROPERTIES DIALOGEX 0, 0, 240, 205
@@ -267,7 +263,7 @@ BEGIN
     LTEXT "Ava programmiga:", 14006, 8, 53, 50, 10
     ICON "", 14025, 58, 52, 11, 10, NOT WS_VISIBLE
     PUSHBUTTON "&Muuda...", 14024, 168, 50, 60, 14, WS_CHILD | WS_VISIBLE | WS_TABSTOP
-    EDITTEXT 14007, 58, 53, 170, 10, ES_LEFT | ES_READONLY | NOT WS_BORDER | ES_AUTOHSCROLL | NOT WS_TABSTOP
+    EDITTEXT 14007, 58, 53, 100, 10, ES_LEFT | ES_READONLY | NOT WS_BORDER | ES_AUTOHSCROLL | NOT WS_TABSTOP
     LTEXT "", -1, 8, 68, 221, 1, SS_ETCHEDHORZ | WS_CHILD | WS_VISIBLE
     LTEXT "Asukoht:", 14008, 8, 75, 45, 10
     EDITTEXT 14009, 58, 75, 170, 10, ES_LEFT | ES_READONLY | NOT WS_BORDER | ES_AUTOHSCROLL | NOT WS_TABSTOP
@@ -392,7 +388,7 @@ STYLE DS_SHELLFONT | WS_CHILD | WS_DISABLED | WS_CAPTION
 CAPTION "Prügikasti atribuudid"
 FONT 8, "MS Shell Dlg", 0, 0, 0x0
 BEGIN
-    CONTROL "", 14000, "SysListView32", LVS_REPORT | LVS_SHAREIMAGELISTS | WS_BORDER | WS_TABSTOP, 10, 10, 220, 50
+    CONTROL "", 14000, "SysListView32", LVS_REPORT | LVS_SHOWSELALWAYS | LVS_SHAREIMAGELISTS | WS_BORDER | WS_TABSTOP, 10, 10, 220, 50
     GROUPBOX "Seaded valitud asukohale", -1, 10, 72, 220, 70
     RADIOBUTTON "&Kohandatud maht:", 14001, 20, 90, 80, 10, WS_TABSTOP
     EDITTEXT 14002, 106, 87, 50, 14, WS_TABSTOP | ES_NUMBER
@@ -758,6 +754,9 @@ BEGIN
     IDS_FONTS_DESCRIPTION "Saad lisada, muuta ja  hallata oma arvutis fonte."
     IDS_PRINTERS_DESCRIPTION "Kuvab installitud printerid ja faksprinterid ja aitab teil uusi lisada."
 
+    /* About shell dialog version string */
+    IDS_ABOUT_VERSION_STRING "Versioon %S (%S)"
+
     /* context menus */
     IDS_VIEW_LARGE "&Suured ikoonid"
     IDS_VIEW_SMALL "&Väikesed ikoonid"
@@ -776,6 +775,17 @@ BEGIN
     IDS_PASTE "Kleebi"
     IDS_EJECT "Väljuta"
     IDS_DISCONNECT "Katkesta ühendus"
+    IDS_OPENFILELOCATION "Open f&ile location"
+    IDS_DESKLINK "Desktop (Create shortcut)"
+    IDS_SENDTO_MENU "Se&nd To"
+
+    IDS_MOVEERRORTITLE "Error Moving File or Folder"
+    IDS_COPYERRORTITLE "Error Copying File or Folder"
+    IDS_MOVEERRORSAMEFOLDER "Cannot move '%s': The destination folder is the same as the source folder."
+    IDS_MOVEERRORSAME "Cannot move '%s': The source and destination file names are the same."
+    IDS_COPYERRORSAME "Cannot copy '%s': The source and destination file names are the same."
+    IDS_MOVEERRORSUBFOLDER "Cannot move '%s': The destination folder is a subfolder of the source folder."
+    IDS_COPYERRORSUBFOLDER "Cannot copy '%s': The destination folder is a subfolder of the source folder."
 
     IDS_CREATEFOLDER_DENIED "Ei saa luua kausta '%1'"
     IDS_CREATEFOLDER_CAPTION "Ei saa kausta luua"
@@ -804,6 +814,11 @@ BEGIN
     IDS_RESTART_PROMPT "Kas soovid taaskäivitada süsteemi?"
     IDS_SHUTDOWN_TITLE "Lülita välja"
     IDS_SHUTDOWN_PROMPT "Kas soovid arvuti välja lülitada?"
+    
+    /* Format Dialog Strings */
+    IDS_FORMAT_TITLE "Format Local Disk"
+    IDS_FORMAT_WARNING "WARNING: Formatting will erase ALL data on this disk.\nTo format the disk, click OK. To quit, click CANCEL."
+    IDS_FORMAT_COMPLETE "Format Complete."
 
     /* Run File dialog */
     IDS_RUNDLG_ERROR "Ei saanud kuvada Run faili dialoogiboksi (sisemine viga)"
@@ -811,7 +826,7 @@ BEGIN
     IDS_RUNDLG_BROWSE_CAPTION "Sirvi"
     IDS_RUNDLG_BROWSE_FILTER "Rakendatavad failid (*.exe)\0*.exe\0Kõik failid (*.*)\0*.*\0"
 
-    /* shell folder path default values */
+    /* Shell folder path default values. See also: dll/win32/userenv/lang */
     IDS_PROGRAMS "Start Menu\\Programs"
     IDS_PERSONAL "Minu dokumendid"
     IDS_FAVORITES "Lemmikud"
@@ -874,6 +889,7 @@ BEGIN
     IDS_CANTEJECTMEDIA "Ei saa meediumit väljutada (Veateade: %lu)."
     IDS_CANTSHOWPROPERTIES "Ei saa atribuute näidata (Veateade: %lu)."
     IDS_CANTDISCONNECT "Ei saa lahti ühendada (Veateade: %lu)."
+    IDS_NONE "(None)"
 
     /* Friendly File Type Names */
     IDS_DIRECTORY "Kaust"
@@ -910,6 +926,7 @@ BEGIN
     IDS_EDIT_VERB "Muuda"
     IDS_FIND_VERB "Leia"
     IDS_PRINT_VERB "Prindi"
+    IDS_CMD_VERB "Command Prompt here"
 
     IDS_FILE_FOLDER "%u Faili, %u Kausta"
     IDS_PRINTERS "Printerid"

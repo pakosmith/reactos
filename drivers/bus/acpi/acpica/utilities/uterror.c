@@ -5,7 +5,7 @@
  ******************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2018, Intel Corp.
+ * Copyright (C) 2000 - 2020, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -80,7 +80,7 @@ AcpiUtPredefinedWarning (
     const char              *ModuleName,
     UINT32                  LineNumber,
     char                    *Pathname,
-    UINT8                   NodeFlags,
+    UINT16                  NodeFlags,
     const char              *Format,
     ...)
 {
@@ -129,7 +129,7 @@ AcpiUtPredefinedInfo (
     const char              *ModuleName,
     UINT32                  LineNumber,
     char                    *Pathname,
-    UINT8                   NodeFlags,
+    UINT16                  NodeFlags,
     const char              *Format,
     ...)
 {
@@ -178,7 +178,7 @@ AcpiUtPredefinedBiosError (
     const char              *ModuleName,
     UINT32                  LineNumber,
     char                    *Pathname,
-    UINT8                   NodeFlags,
+    UINT16                  NodeFlags,
     const char              *Format,
     ...)
 {
@@ -245,19 +245,19 @@ AcpiUtPrefixedNamespaceError (
     case AE_ALREADY_EXISTS:
 
         AcpiOsPrintf (ACPI_MSG_BIOS_ERROR);
-        Message = "Failure creating";
+        Message = "Failure creating named object";
         break;
 
     case AE_NOT_FOUND:
 
         AcpiOsPrintf (ACPI_MSG_BIOS_ERROR);
-        Message = "Could not resolve";
+        Message = "Could not resolve symbol";
         break;
 
     default:
 
         AcpiOsPrintf (ACPI_MSG_ERROR);
-        Message = "Failure resolving";
+        Message = "Failure resolving symbol";
         break;
     }
 
@@ -392,7 +392,8 @@ AcpiUtMethodError (
     }
 
     AcpiNsPrintNodePathname (Node, Message);
-    AcpiOsPrintf (", %s", AcpiFormatException (MethodStatus));
+    AcpiOsPrintf (" due to previous error (%s)",
+        AcpiFormatException (MethodStatus));
 
     ACPI_MSG_SUFFIX;
     ACPI_MSG_REDIRECT_END;

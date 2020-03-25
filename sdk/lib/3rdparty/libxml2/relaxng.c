@@ -1573,6 +1573,9 @@ xmlRelaxNGRemoveRedefine(xmlRelaxNGParserCtxtPtr ctxt,
 #endif
                 }
             }
+            if (xmlRelaxNGRemoveRedefine(ctxt, URL, tmp->children, name) == 1) {
+                found = 1;
+            }
         }
         tmp = tmp2;
     }
@@ -1739,7 +1742,18 @@ xmlRelaxNGLoadInclude(xmlRelaxNGParserCtxtPtr ctxt, const xmlChar * URL,
                 xmlFree(name);
             }
         }
-        cur = cur->next;
+        if (IS_RELAXNG(cur, "div") && cur->children != NULL) {
+            cur = cur->children;
+        } else {
+            if (cur->next != NULL) {
+                cur = cur->next;
+            } else {
+                while (cur->parent != node && cur->parent->next == NULL) {
+                    cur = cur->parent;
+                }
+                cur = cur->parent != node ? cur->parent->next : NULL;
+            }
+        }
     }
 
 
@@ -2729,9 +2743,10 @@ static xmlHashTablePtr xmlRelaxNGRegisteredTypes = NULL;
  * Free the structure associated to the type library
  */
 static void
-xmlRelaxNGFreeTypeLibrary(xmlRelaxNGTypeLibraryPtr lib,
+xmlRelaxNGFreeTypeLibrary(void *payload,
                           const xmlChar * namespace ATTRIBUTE_UNUSED)
 {
+    xmlRelaxNGTypeLibraryPtr lib = (xmlRelaxNGTypeLibraryPtr) payload;
     if (lib == NULL)
         return;
     if (lib->namespace != NULL)
@@ -2842,8 +2857,7 @@ xmlRelaxNGCleanupTypes(void)
     xmlSchemaCleanupTypes();
     if (xmlRelaxNGTypeInitialized == 0)
         return;
-    xmlHashFree(xmlRelaxNGRegisteredTypes, (xmlHashDeallocator)
-                xmlRelaxNGFreeTypeLibrary);
+    xmlHashFree(xmlRelaxNGRegisteredTypes, xmlRelaxNGFreeTypeLibrary);
     xmlRelaxNGTypeInitialized = 0;
 }
 
@@ -3979,7 +3993,7 @@ xmlRelaxNGGenerateAttributes(xmlRelaxNGParserCtxtPtr ctxt,
  * xmlRelaxNGGetElements:
  * @ctxt:  a Relax-NG parser context
  * @def:  the definition definition
- * @eora:  gather elements (0) or attributes (1)
+ * @eora:  gather elements (0), attributes (1) or elements and text (2)
  *
  * Compute the list of top elements a definition can generate
  *
@@ -4005,7 +4019,12 @@ xmlRelaxNGGetElements(xmlRelaxNGParserCtxtPtr ctxt,
     while (cur != NULL) {
         if (((eora == 0) && ((cur->type == XML_RELAXNG_ELEMENT) ||
                              (cur->type == XML_RELAXNG_TEXT))) ||
-            ((eora == 1) && (cur->type == XML_RELAXNG_ATTRIBUTE))) {
+            ((eora == 1) && (cur->type == XML_RELAXNG_ATTRIBUTE)) ||
+            ((eora == 2) && ((cur->type == XML_RELAXNG_DATATYPE) ||
+	                     (cur->type == XML_RELAXNG_ELEMENT) ||
+			     (cur->type == XML_RELAXNG_LIST) ||
+                             (cur->type == XML_RELAXNG_TEXT) ||
+			     (cur->type == XML_RELAXNG_VALUE)))) {
             if (ret == NULL) {
                 max = 10;
                 ret = (xmlRelaxNGDefinePtr *)
@@ -4311,10 +4330,11 @@ xmlRelaxNGCheckGroupAttrs(xmlRelaxNGParserCtxtPtr ctxt,
  *     algorithm
  */
 static void
-xmlRelaxNGComputeInterleaves(xmlRelaxNGDefinePtr def,
-                             xmlRelaxNGParserCtxtPtr ctxt,
-                             xmlChar * name ATTRIBUTE_UNUSED)
+xmlRelaxNGComputeInterleaves(void *payload, void *data,
+                             const xmlChar * name ATTRIBUTE_UNUSED)
 {
+    xmlRelaxNGDefinePtr def = (xmlRelaxNGDefinePtr) payload;
+    xmlRelaxNGParserCtxtPtr ctxt = (xmlRelaxNGParserCtxtPtr) data;
     xmlRelaxNGDefinePtr cur, *tmp;
 
     xmlRelaxNGPartitionPtr partitions = NULL;
@@ -4359,7 +4379,7 @@ xmlRelaxNGComputeInterleaves(xmlRelaxNGDefinePtr def,
         if (cur->type == XML_RELAXNG_TEXT)
             is_mixed++;
         groups[nbgroups]->rule = cur;
-        groups[nbgroups]->defs = xmlRelaxNGGetElements(ctxt, cur, 0);
+        groups[nbgroups]->defs = xmlRelaxNGGetElements(ctxt, cur, 2);
         groups[nbgroups]->attrs = xmlRelaxNGGetElements(ctxt, cur, 1);
         nbgroups++;
         cur = cur->next;
@@ -4663,7 +4683,7 @@ xmlRelaxNGParseDefine(xmlRelaxNGParserCtxtPtr ctxt, xmlNodePtr node)
  * Import import one references into the current grammar
  */
 static void
-xmlRelaxNGParseImportRef(void *payload, void *data, xmlChar *name) {
+xmlRelaxNGParseImportRef(void *payload, void *data, const xmlChar *name) {
     xmlRelaxNGParserCtxtPtr ctxt = (xmlRelaxNGParserCtxtPtr) data;
     xmlRelaxNGDefinePtr def = (xmlRelaxNGDefinePtr) payload;
     int tmp;
@@ -5346,11 +5366,15 @@ xmlRelaxNGParseNameClass(xmlRelaxNGParserCtxtPtr ctxt, xmlNodePtr node,
         xmlNodePtr child;
         xmlRelaxNGDefinePtr last = NULL;
 
-        ret = xmlRelaxNGNewDefine(ctxt, node);
-        if (ret == NULL)
-            return (NULL);
-        ret->parent = def;
-        ret->type = XML_RELAXNG_CHOICE;
+        if (def->type == XML_RELAXNG_CHOICE) {
+            ret = def;
+        } else {
+            ret = xmlRelaxNGNewDefine(ctxt, node);
+            if (ret == NULL)
+                return (NULL);
+            ret->parent = def;
+            ret->type = XML_RELAXNG_CHOICE;
+        }
 
         if (node->children == NULL) {
             xmlRngPErr(ctxt, node, XML_RNGP_CHOICE_EMPTY,
@@ -5362,7 +5386,7 @@ xmlRelaxNGParseNameClass(xmlRelaxNGParserCtxtPtr ctxt, xmlNodePtr node,
                 tmp = xmlRelaxNGParseNameClass(ctxt, child, ret);
                 if (tmp != NULL) {
                     if (last == NULL) {
-                        last = ret->nameClass = tmp;
+                        last = tmp;
                     } else {
                         last->next = tmp;
                         last = tmp;
@@ -5670,10 +5694,10 @@ xmlRelaxNGParseGrammarContent(xmlRelaxNGParserCtxtPtr ctxt,
  * element of a given grammar using the same name.
  */
 static void
-xmlRelaxNGCheckReference(xmlRelaxNGDefinePtr ref,
-                         xmlRelaxNGParserCtxtPtr ctxt,
-                         const xmlChar * name)
+xmlRelaxNGCheckReference(void *payload, void *data, const xmlChar * name)
 {
+    xmlRelaxNGDefinePtr ref = (xmlRelaxNGDefinePtr) payload;
+    xmlRelaxNGParserCtxtPtr ctxt = (xmlRelaxNGParserCtxtPtr) data;
     xmlRelaxNGGrammarPtr grammar;
     xmlRelaxNGDefinePtr def, cur;
 
@@ -5726,9 +5750,10 @@ xmlRelaxNGCheckReference(xmlRelaxNGDefinePtr ref,
  * element of a given grammar using the same name.
  */
 static void
-xmlRelaxNGCheckCombine(xmlRelaxNGDefinePtr define,
-                       xmlRelaxNGParserCtxtPtr ctxt, const xmlChar * name)
+xmlRelaxNGCheckCombine(void *payload, void *data, const xmlChar * name)
 {
+    xmlRelaxNGDefinePtr define = (xmlRelaxNGDefinePtr) payload;
+    xmlRelaxNGParserCtxtPtr ctxt = (xmlRelaxNGParserCtxtPtr) data;
     xmlChar *combine;
     int choiceOrInterleave = -1;
     int missing = 0;
@@ -6611,16 +6636,14 @@ xmlRelaxNGParseGrammar(xmlRelaxNGParserCtxtPtr ctxt, xmlNodePtr nodes)
      */
     xmlRelaxNGCombineStart(ctxt, ret);
     if (ret->defs != NULL) {
-        xmlHashScan(ret->defs, (xmlHashScanner) xmlRelaxNGCheckCombine,
-                    ctxt);
+        xmlHashScan(ret->defs, xmlRelaxNGCheckCombine, ctxt);
     }
 
     /*
      * link together defines and refs in this grammar
      */
     if (ret->refs != NULL) {
-        xmlHashScan(ret->refs, (xmlHashScanner) xmlRelaxNGCheckReference,
-                    ctxt);
+        xmlHashScan(ret->refs, xmlRelaxNGCheckReference, ctxt);
     }
 
 
@@ -7551,8 +7574,7 @@ xmlRelaxNGParse(xmlRelaxNGParserCtxtPtr ctxt)
      * try to preprocess interleaves
      */
     if (ctxt->interleaves != NULL) {
-        xmlHashScan(ctxt->interleaves,
-                    (xmlHashScanner) xmlRelaxNGComputeInterleaves, ctxt);
+        xmlHashScan(ctxt->interleaves, xmlRelaxNGComputeInterleaves, ctxt);
     }
 
     /*
@@ -9263,7 +9285,10 @@ xmlRelaxNGNodeMatchesList(xmlNodePtr node, xmlRelaxNGDefinePtr * list)
                 return (1);
         } else if (((node->type == XML_TEXT_NODE) ||
                     (node->type == XML_CDATA_SECTION_NODE)) &&
-                   (cur->type == XML_RELAXNG_TEXT)) {
+                   ((cur->type == XML_RELAXNG_DATATYPE) ||
+		    (cur->type == XML_RELAXNG_LIST) ||
+                    (cur->type == XML_RELAXNG_TEXT) ||
+                    (cur->type == XML_RELAXNG_VALUE))) {
             return (1);
         }
         cur = list[i++];

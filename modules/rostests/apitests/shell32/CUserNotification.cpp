@@ -88,7 +88,7 @@ TestNotification(void)
     }
     
     /* Set an invalid icon for the notification icon */
-    hr = pUserNotif->SetIconInfo((HICON)0xdeadbeef, L"Tooltip text");
+    hr = pUserNotif->SetIconInfo((HICON)UlongToHandle(0xdeadbeef), L"Tooltip text");
     ok_hr(hr, S_OK);
 
 #if 0
@@ -196,7 +196,7 @@ START_TEST(CUserNotification)
     ok(hThread != NULL, "CreateThread failed with error 0x%lu\n", GetLastError());
     if (!hThread)
     {
-        skip("Could not create the CUserNotification test thread!");
+        skip("Could not create the CUserNotification test thread!\n");
         return;
     }
 

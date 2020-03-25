@@ -1,11 +1,17 @@
 /*
  * PROJECT:     ReactOS Shim helper library
- * LICENSE:     GPL-2.0+ (https://spdx.org/licenses/GPL-2.0+)
+ * LICENSE:     GPL-2.0-or-later (https://spdx.org/licenses/GPL-2.0-or-later)
  * PURPOSE:     ReactOS Shim Engine common functions / structures
- * COPYRIGHT:   Copyright 2016-2018 Mark Jansen (mark.jansen@reactos.org)
+ * COPYRIGHT:   Copyright 2016-2019 Mark Jansen (mark.jansen@reactos.org)
  */
 
 #pragma once
+
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 
 typedef struct tagHOOKAPI
 {
@@ -21,8 +27,8 @@ PVOID ShimLib_ShimMalloc(SIZE_T dwSize);
 VOID ShimLib_ShimFree(PVOID pData);
 PCSTR ShimLib_StringDuplicateA(PCSTR szString);
 PCSTR ShimLib_StringNDuplicateA(PCSTR szString, SIZE_T stringLength);
-BOOL ShimLib_StrAEqualsW(PCSTR szString, PCWSTR wszString);
-
+BOOL ShimLib_StrAEqualsWNC(PCSTR szString, PCWSTR wszString);
+HINSTANCE ShimLib_Instance(VOID);
 
 /* Forward events to generic handlers */
 VOID ShimLib_Init(HINSTANCE hInstance);
@@ -89,5 +95,9 @@ typedef struct tagSHIMREG
 #define _SHMALLOC(x) __attribute__ ((section (x) ))
 #else
 #error Your compiler is not supported.
+#endif
+
+#ifdef __cplusplus
+} // extern "C"
 #endif
 

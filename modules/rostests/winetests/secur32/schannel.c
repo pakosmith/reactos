@@ -202,6 +202,7 @@ static void test_supported_protocols(CredHandle *handle, unsigned exprots)
     X(SP_PROT_TLS1_0_CLIENT, "TLS 1.0 client");
     X(SP_PROT_TLS1_1_CLIENT, "TLS 1.1 client");
     X(SP_PROT_TLS1_2_CLIENT, "TLS 1.2 client");
+    X(SP_PROT_TLS1_3_CLIENT, "TLS 1.3 client");
 #undef X
 
     if(protocols.grbitProtocol)
@@ -434,11 +435,13 @@ static void testAcquireSecurityContext(void)
     ok(ret, "CertSetCertificateContextProperty failed: %08x\n", GetLastError());
     st = AcquireCredentialsHandleA(NULL, unisp_name_a, SECPKG_CRED_OUTBOUND,
         NULL, &schanCred, NULL, NULL, &cred, NULL);
-    ok(st == SEC_E_UNKNOWN_CREDENTIALS || st == SEC_E_INTERNAL_ERROR /* WinNT */,
+    ok(st == SEC_E_UNKNOWN_CREDENTIALS || st == SEC_E_INTERNAL_ERROR /* WinNT */ ||
+       st == SEC_E_INSUFFICIENT_MEMORY /* win10 */,
        "Expected SEC_E_UNKNOWN_CREDENTIALS or SEC_E_INTERNAL_ERROR, got %08x\n", st);
     st = AcquireCredentialsHandleA(NULL, unisp_name_a, SECPKG_CRED_INBOUND,
         NULL, &schanCred, NULL, NULL, &cred, NULL);
-    ok(st == SEC_E_UNKNOWN_CREDENTIALS || st == SEC_E_INTERNAL_ERROR /* WinNT */,
+    ok(st == SEC_E_UNKNOWN_CREDENTIALS || st == SEC_E_INTERNAL_ERROR /* WinNT */ ||
+       st == SEC_E_INSUFFICIENT_MEMORY /* win10 */,
         "Expected SEC_E_UNKNOWN_CREDENTIALS or SEC_E_INTERNAL_ERROR, got %08x\n", st);
 
     ret = CryptAcquireContextW(&csp, cspNameW, MS_DEF_PROV_W, PROV_RSA_FULL,
@@ -488,12 +491,13 @@ static void testAcquireSecurityContext(void)
         schanCred.dwVersion = SCH_CRED_V3;
         st = AcquireCredentialsHandleA(NULL, unisp_name_a, SECPKG_CRED_OUTBOUND,
          NULL, &schanCred, NULL, NULL, &cred, NULL);
-        ok(st == SEC_E_OK, "AcquireCredentialsHandleA failed: %08x\n", st);
+        ok(st == SEC_E_OK || st == SEC_E_INSUFFICIENT_MEMORY /* win10 */,
+           "AcquireCredentialsHandleA failed: %08x\n", st);
         FreeCredentialsHandle(&cred);
         st = AcquireCredentialsHandleA(NULL, unisp_name_a, SECPKG_CRED_INBOUND,
          NULL, &schanCred, NULL, NULL, &cred, NULL);
-        ok(st == SEC_E_OK ||
-           st == SEC_E_UNKNOWN_CREDENTIALS, /* win2k3 */
+        ok(st == SEC_E_OK || st == SEC_E_UNKNOWN_CREDENTIALS /* win2k3 */ ||
+           st == SEC_E_INSUFFICIENT_MEMORY /* win10 */,
            "AcquireCredentialsHandleA failed: %08x\n", st);
         FreeCredentialsHandle(&cred);
         schanCred.dwVersion = SCHANNEL_CRED_VERSION;
@@ -532,7 +536,7 @@ static void testAcquireSecurityContext(void)
            st == SEC_E_INVALID_TOKEN /* WinNT */, "st = %08x\n", st);
         st = AcquireCredentialsHandleA(NULL, unisp_name_a, SECPKG_CRED_INBOUND,
          NULL, &schanCred, NULL, NULL, &cred, NULL);
-        ok(st == SEC_E_UNKNOWN_CREDENTIALS,
+        ok(st == SEC_E_UNKNOWN_CREDENTIALS || st == SEC_E_NO_CREDENTIALS,
          "Expected SEC_E_UNKNOWN_CREDENTIALS, got %08x\n", st);
         /* FIXME: what about two valid certs? */
 
@@ -560,11 +564,11 @@ static void test_remote_cert(PCCERT_CONTEXT remote_cert)
         cert_cnt++;
     }
 
-    ok(cert_cnt == 2 || cert_cnt == 3, "cert_cnt = %u\n", cert_cnt);
+    ok(cert_cnt == 4, "cert_cnt = %u\n", cert_cnt);
     ok(incl_remote, "context does not contain cert itself\n");
 }
 
-static const char http_request[] = "HEAD /test.html HTTP/1.1\r\nHost: www.winehq.org\r\nConnection: close\r\n\r\n";
+static const char http_request[] = "HEAD /test.html HTTP/1.1\r\nHost: test.winehq.org\r\nConnection: close\r\n\r\n";
 
 static void init_buffers(SecBufferDesc *desc, unsigned count, unsigned size)
 {
@@ -690,7 +694,7 @@ static void test_communication(void)
 
     SecBufferDesc buffers[2];
     SecBuffer *buf;
-    unsigned buf_size = 4000;
+    unsigned buf_size = 8192;
     unsigned char *data;
     unsigned data_size;
 
@@ -700,7 +704,7 @@ static void test_communication(void)
         return;
     }
 
-    /* Create a socket and connect to www.winehq.org */
+    /* Create a socket and connect to test.winehq.org */
     ret = WSAStartup(0x0202, &wsa_data);
     if (ret)
     {
@@ -708,10 +712,10 @@ static void test_communication(void)
         return;
     }
 
-    host = gethostbyname("www.winehq.org");
+    host = gethostbyname("test.winehq.org");
     if (!host)
     {
-        skip("Can't resolve www.winehq.org\n");
+        skip("Can't resolve test.winehq.org\n");
         return;
     }
 
@@ -728,7 +732,7 @@ static void test_communication(void)
     ret = connect(sock, (struct sockaddr *)&addr, sizeof(addr));
     if (ret == SOCKET_ERROR)
     {
-        skip("Can't connect to www.winehq.org\n");
+        skip("Can't connect to test.winehq.org\n");
         return;
     }
 
@@ -806,7 +810,7 @@ todo_wine
     ok(buffers[0].pBuffers[0].cbBuffer == buf_size, "Output buffer size changed.\n");
     ok(buffers[0].pBuffers[0].BufferType == SECBUFFER_TOKEN, "Output buffer type changed.\n");
 
-    buffers[1].cBuffers = 4;
+    buffers[1].cBuffers = 1;
     buffers[1].pBuffers[0].cbBuffer = 0;
 
     status = InitializeSecurityContextA(&cred_handle, &context, (SEC_CHAR *)"localhost",
@@ -842,7 +846,7 @@ todo_wine
 
     buffers[1].pBuffers[0].cbBuffer = ret;
     status = InitializeSecurityContextA(&cred_handle, &context, (SEC_CHAR *)"localhost",
-            ISC_REQ_CONFIDENTIALITY|ISC_REQ_STREAM,
+            ISC_REQ_CONFIDENTIALITY|ISC_REQ_STREAM|ISC_REQ_USE_SUPPLIED_CREDS,
             0, 0, &buffers[1], 0, NULL, &buffers[0], &attrs, NULL);
     buffers[1].pBuffers[0].cbBuffer = buf_size;
     while (status == SEC_I_CONTINUE_NEEDED)
@@ -859,18 +863,20 @@ todo_wine
         buf->BufferType = SECBUFFER_TOKEN;
 
         status = InitializeSecurityContextA(&cred_handle, &context, (SEC_CHAR *)"localhost",
-            ISC_REQ_CONFIDENTIALITY|ISC_REQ_STREAM,
+            ISC_REQ_USE_SUPPLIED_CREDS,
             0, 0, &buffers[1], 0, NULL, &buffers[0], &attrs, NULL);
         buffers[1].pBuffers[0].cbBuffer = buf_size;
     }
 
     ok(buffers[0].pBuffers[0].cbBuffer == 0, "Output buffer size was not set to 0.\n");
-    ok(status == SEC_E_OK || broken(status == SEC_E_INVALID_TOKEN) /* WinNT */,
-        "InitializeSecurityContext failed: %08x\n", status);
+    ok(status == SEC_E_OK || broken(status == SEC_E_ILLEGAL_MESSAGE) /* winxp */,
+       "InitializeSecurityContext failed: %08x\n", status);
     if(status != SEC_E_OK) {
-        win_skip("Handshake failed\n");
+        skip("Handshake failed\n");
         return;
     }
+    ok(attrs == (ISC_RET_REPLAY_DETECT|ISC_RET_SEQUENCE_DETECT|ISC_RET_CONFIDENTIALITY|ISC_RET_STREAM|ISC_RET_USED_SUPPLIED_CREDS),
+       "got %08x\n", attrs);
 
     status = QueryCredentialsAttributesA(&cred_handle, SECPKG_CRED_ATTR_NAMES, &names);
     ok(status == SEC_E_NO_CREDENTIALS || status == SEC_E_UNSUPPORTED_FUNCTION /* before Vista */, "expected SEC_E_NO_CREDENTIALS, got %08x\n", status);

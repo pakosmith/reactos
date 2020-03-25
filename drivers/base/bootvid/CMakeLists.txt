@@ -8,13 +8,14 @@ if((ARCH STREQUAL "i386") OR (ARCH STREQUAL "amd64"))
         i386/vga.c)
 elseif(ARCH STREQUAL "arm")
     list(APPEND SOURCE
-        arm/bootvid.c
-        arm/bootdata.c)
+        arm/bootvid.c)
 endif()
 
-list(APPEND SOURCE precomp.h)
+list(APPEND SOURCE
+    fontdata.c
+    precomp.h)
 
-add_library(bootvid SHARED
+add_library(bootvid MODULE
     ${SOURCE}
     bootvid.rc
     ${CMAKE_CURRENT_BINARY_DIR}/bootvid.def)

@@ -35,7 +35,6 @@
 
 #include "shdocvw.h"
 
-#include "wine/unicode.h"
 #include "wine/debug.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(shdocvw);
@@ -361,8 +360,8 @@ HRESULT SHDOCVW_GetShellInstanceObjectClassObject(REFCLSID rclsid, REFIID riid,
     WCHAR wszInstanceKey[] = { 'C','L','S','I','D','\\','{','0','0','0','0','0','0','0','0','-',
         '0','0','0','0','-','0','0','0','0','-','0','0','0','0','-','0','0','0','0','0','0','0','0',
         '0','0','0','0','}','\\','I','n','s','t','a','n','c','e', 0 };
-    const WCHAR wszCLSID[] = { 'C','L','S','I','D',0 };
-    const WCHAR wszInitPropertyBag[] = 
+    static const WCHAR wszCLSID[] = { 'C','L','S','I','D',0 };
+    static const WCHAR wszInitPropertyBag[] =
         { 'I','n','i','t','P','r','o','p','e','r','t','y','B','a','g',0 };
     WCHAR wszCLSIDInstance[CHARS_IN_GUID];
     CLSID clsidInstance;

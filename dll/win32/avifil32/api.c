@@ -38,7 +38,6 @@
 #include "avifile_private.h"
 
 #include "wine/debug.h"
-#include "wine/unicode.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(avifile);
 
@@ -155,7 +154,7 @@ static BOOL AVIFILE_GetFileHandlerByExtension(LPCWSTR szFile, LPCLSID lpclsid)
 {
   CHAR   szRegKey[25];
   CHAR   szValue[100];
-  LPWSTR szExt = strrchrW(szFile, '.');
+  LPWSTR szExt = wcsrchr(szFile, '.');
   LONG   len = ARRAY_SIZE(szValue);
 
   if (szExt == NULL)
@@ -1119,10 +1118,10 @@ HRESULT WINAPI AVIBuildFilterW(LPWSTR szFilter, LONG cbFilter, BOOL fSaving)
   HeapFree(GetProcessHeap(), 0, lp);
 
   /* add "All files" "*.*" filter if enough space left */
-  size = LoadStringW(AVIFILE_hModule, IDS_ALLFILES,
-                     szAllFiles, (sizeof(szAllFiles) - sizeof(all_files))/sizeof(WCHAR)) + 1;
+  size = LoadStringW(AVIFILE_hModule, IDS_ALLFILES, szAllFiles,
+                     ARRAY_SIZE(szAllFiles) - ARRAY_SIZE(all_files)) + 1;
   memcpy( szAllFiles + size, all_files, sizeof(all_files) );
-  size += sizeof(all_files) / sizeof(WCHAR);
+  size += ARRAY_SIZE(all_files);
 
   if (cbFilter > size) {
     memcpy(szFilter, szAllFiles, size * sizeof(szAllFiles[0]));
@@ -2109,8 +2108,7 @@ HRESULT WINAPI EditStreamSetInfoA(PAVISTREAM pstream, LPAVISTREAMINFOA asi,
     return AVIERR_BADSIZE;
 
   memcpy(&asiw, asi, sizeof(asiw) - sizeof(asiw.szName));
-  MultiByteToWideChar(CP_ACP, 0, asi->szName, -1,
-		      asiw.szName, sizeof(asiw.szName)/sizeof(WCHAR));
+  MultiByteToWideChar(CP_ACP, 0, asi->szName, -1, asiw.szName, ARRAY_SIZE(asiw.szName));
 
   return EditStreamSetInfoW(pstream, &asiw, sizeof(asiw));
 }

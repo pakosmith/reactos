@@ -206,9 +206,26 @@ HRESULT CFSDropTarget::_GetEffectFromMenu(IDataObject *pDataObject, POINTL pt, D
 
     /* FIXME: We need to support shell extensions here */
 
+    /* We shouldn't use the site window here because the menu should work even when we don't have a site */
+    HWND hwndDummy = CreateWindowEx(0,
+                              WC_STATIC,
+                              NULL,
+                              WS_OVERLAPPED | WS_DISABLED | WS_CLIPSIBLINGS | WS_BORDER | SS_LEFT,
+                              pt.x,
+                              pt.y,
+                              1,
+                              1,
+                              NULL,
+                              NULL,
+                              NULL,
+                              NULL);
+
     UINT uCommand = TrackPopupMenu(hpopupmenu,
                                    TPM_LEFTALIGN | TPM_RETURNCMD | TPM_LEFTBUTTON | TPM_RIGHTBUTTON | TPM_NONOTIFY,
-                                   pt.x, pt.y, 0, m_hwndSite, NULL);
+                                   pt.x, pt.y, 0, hwndDummy, NULL);
+
+    DestroyWindow(hwndDummy);
+
     if (uCommand == 0)
         return S_FALSE;
     else if (uCommand == IDM_COPYHERE)
@@ -266,6 +283,10 @@ HRESULT WINAPI CFSDropTarget::DragEnter(IDataObject *pDataObject,
                                         DWORD dwKeyState, POINTL pt, DWORD *pdwEffect)
 {
     TRACE("(%p)->(DataObject=%p)\n", this, pDataObject);
+
+    if (*pdwEffect == DROPEFFECT_NONE)
+        return S_OK;
+
     FORMATETC fmt;
     FORMATETC fmt2;
     m_fAcceptFmt = FALSE;
@@ -279,7 +300,41 @@ HRESULT WINAPI CFSDropTarget::DragEnter(IDataObject *pDataObject,
         m_fAcceptFmt = TRUE;
 
     m_grfKeyState = dwKeyState;
-    m_dwDefaultEffect = DROPEFFECT_MOVE;
+
+#define D_NONE DROPEFFECT_NONE
+#define D_COPY DROPEFFECT_COPY
+#define D_MOVE DROPEFFECT_MOVE
+#define D_LINK DROPEFFECT_LINK
+    m_dwDefaultEffect = *pdwEffect;
+    switch (*pdwEffect & (D_COPY | D_MOVE | D_LINK))
+    {
+        case D_COPY | D_MOVE:
+            if (dwKeyState & MK_CONTROL)
+                m_dwDefaultEffect = D_COPY;
+            else
+                m_dwDefaultEffect = D_MOVE;
+            break;
+        case D_COPY | D_MOVE | D_LINK:
+            if ((dwKeyState & (MK_SHIFT | MK_CONTROL)) == (MK_SHIFT | MK_CONTROL))
+                m_dwDefaultEffect = D_LINK;
+            else if ((dwKeyState & (MK_SHIFT | MK_CONTROL)) == MK_CONTROL)
+                m_dwDefaultEffect = D_COPY;
+            else
+                m_dwDefaultEffect = D_MOVE;
+            break;
+        case D_COPY | D_LINK:
+            if ((dwKeyState & (MK_SHIFT | MK_CONTROL)) == (MK_SHIFT | MK_CONTROL))
+                m_dwDefaultEffect = D_LINK;
+            else
+                m_dwDefaultEffect = D_COPY;
+            break;
+        case D_MOVE | D_LINK:
+            if ((dwKeyState & (MK_SHIFT | MK_CONTROL)) == (MK_SHIFT | MK_CONTROL))
+                m_dwDefaultEffect = D_LINK;
+            else
+                m_dwDefaultEffect = D_MOVE;
+            break;
+    }
 
     STGMEDIUM medium;
     if (SUCCEEDED(pDataObject->GetData(&fmt2, &medium)))
@@ -296,7 +351,11 @@ HRESULT WINAPI CFSDropTarget::DragEnter(IDataObject *pDataObject,
         ReleaseStgMedium(&medium);
     }
 
-    _QueryDrop(dwKeyState, pdwEffect);
+    if (!m_fAcceptFmt)
+        *pdwEffect = DROPEFFECT_NONE;
+    else
+        *pdwEffect = m_dwDefaultEffect;
+
     return S_OK;
 }
 

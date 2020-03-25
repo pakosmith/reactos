@@ -5,6 +5,7 @@ list(APPEND INF_FILES
     battery.inf
     bda.inf
     bth.inf
+    btrfs.inf
     c_image.inf
     cdrom.inf
     cpu.inf
@@ -25,6 +26,7 @@ list(APPEND INF_FILES
     msmouse.inf
     NET_NIC.inf
     netamd.inf
+    nete1000.inf
     netisa.inf
     netrtl.inf
     netrtpnt.inf

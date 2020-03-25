@@ -199,6 +199,7 @@ list(APPEND SOURCE
     ${REACTOS_SOURCE_DIR}/ntoskrnl/mm/ARM3/expool.c
     ${REACTOS_SOURCE_DIR}/ntoskrnl/mm/ARM3/hypermap.c
     ${REACTOS_SOURCE_DIR}/ntoskrnl/mm/ARM3/iosup.c
+    ${REACTOS_SOURCE_DIR}/ntoskrnl/mm/ARM3/kdbg.c
     ${REACTOS_SOURCE_DIR}/ntoskrnl/mm/ARM3/largepag.c
     ${REACTOS_SOURCE_DIR}/ntoskrnl/mm/ARM3/mdlsup.c
     ${REACTOS_SOURCE_DIR}/ntoskrnl/mm/ARM3/mmdbg.c
@@ -368,7 +369,6 @@ if(NOT _WINKD_)
     if(ARCH STREQUAL "i386")
         list(APPEND SOURCE
             ${REACTOS_SOURCE_DIR}/ntoskrnl/kd/i386/kdbg.c
-            ${REACTOS_SOURCE_DIR}/ntoskrnl/kd/i386/kdmemsup.c
             ${REACTOS_SOURCE_DIR}/ntoskrnl/kd/wrappers/gdbstub.c)
         if(KDBG)
             list(APPEND ASM_SOURCE ${REACTOS_SOURCE_DIR}/ntoskrnl/kdbg/i386/kdb_help.S)
@@ -376,9 +376,8 @@ if(NOT _WINKD_)
         endif()
     elseif(ARCH STREQUAL "amd64")
         list(APPEND SOURCE
-            ${REACTOS_SOURCE_DIR}/ntoskrnl/kd/amd64/kd.c
             ${REACTOS_SOURCE_DIR}/ntoskrnl/kd/i386/kdbg.c  # Use the x86 file
-            ${REACTOS_SOURCE_DIR}/ntoskrnl/kd/amd64/kdmemsup.c)
+            ${REACTOS_SOURCE_DIR}/ntoskrnl/kd/amd64/kd.c)
         if(KDBG)
             list(APPEND ASM_SOURCE ${REACTOS_SOURCE_DIR}/ntoskrnl/kdbg/amd64/kdb_help.S)
             list(APPEND SOURCE
@@ -406,7 +405,10 @@ if(NOT _WINKD_)
         ${REACTOS_SOURCE_DIR}/ntoskrnl/kd/wrappers/kdbg.c
         ${REACTOS_SOURCE_DIR}/ntoskrnl/kd/kdinit.c
         ${REACTOS_SOURCE_DIR}/ntoskrnl/kd/kdio.c
-        ${REACTOS_SOURCE_DIR}/ntoskrnl/kd/kdmain.c)
+        ${REACTOS_SOURCE_DIR}/ntoskrnl/kd/kdmain.c
+        ${REACTOS_SOURCE_DIR}/ntoskrnl/kd64/kdapi.c
+        ${REACTOS_SOURCE_DIR}/ntoskrnl/kd64/kddata.c
+        ${REACTOS_SOURCE_DIR}/ntoskrnl/kd64/kdprint.c)
 
 else() # _WINKD_
 

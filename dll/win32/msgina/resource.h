@@ -55,9 +55,11 @@
 #define IDC_LEGALNOTICE_TEXT     2101
 
 #define IDC_ROSLOGO              1007
+#define IDC_BAR                  1008
 
 
 #define IDI_ROSLOGO         20000
+#define IDI_BAR             20001
 
 #define IDI_NOT_CONNECTED 13
 #define IDI_LOGOFF        21
@@ -87,6 +89,10 @@
 #define IDS_PASSWORDMUSTCHANGE   40018
 #define IDS_PASSWORDEXPIRED      40019
 #define IDS_ACCOUNTEXPIRED       40020
+#define IDS_ACCOUNTLOCKED        40021
+#define IDS_INVALIDLOGONHOURS    40022
+#define IDS_INVALIDWORKSTATION   40023
+#define IDS_ACCOUNTRESTRICTION   40024
 
 #define IDS_SHUTDOWN_SHUTDOWN         50000
 #define IDS_SHUTDOWN_LOGOFF           50001

@@ -18,8 +18,6 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#include "config.h"
-
 #include <stdlib.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -144,7 +142,7 @@ FTMarshalImpl_GetUnmarshalClass (LPMARSHAL iface, REFIID riid, void *pv, DWORD d
     if (dwDestContext == MSHCTX_INPROC || dwDestContext == MSHCTX_CROSSCTX)
         *pCid = CLSID_InProcFreeMarshaler;
     else
-        *pCid = CLSID_DfMarshal;
+        *pCid = CLSID_StdMarshal;
     return S_OK;
 }
 

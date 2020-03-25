@@ -64,7 +64,7 @@ static name_space *find_name_space(LPCWSTR protocol)
     name_space *iter;
 
     LIST_FOR_EACH_ENTRY(iter, &name_space_list, name_space, entry) {
-        if(!strcmpiW(iter->protocol, protocol))
+        if(!wcsicmp(iter->protocol, protocol))
             return iter;
     }
 
@@ -86,7 +86,7 @@ static HRESULT get_protocol_cf(LPCWSTR schema, DWORD schema_len, CLSID *pclsid, 
 
     wszKey = heap_alloc(sizeof(wszProtocolsKey)+(schema_len+1)*sizeof(WCHAR));
     memcpy(wszKey, wszProtocolsKey, sizeof(wszProtocolsKey));
-    memcpy(wszKey + sizeof(wszProtocolsKey)/sizeof(WCHAR), schema, (schema_len+1)*sizeof(WCHAR));
+    memcpy(wszKey + ARRAY_SIZE(wszProtocolsKey), schema, (schema_len+1)*sizeof(WCHAR));
 
     res = RegOpenKeyW(HKEY_CLASSES_ROOT, wszKey, &hkey);
     heap_free(wszKey);
@@ -148,7 +148,7 @@ static HRESULT unregister_namespace(IClassFactory *cf, LPCWSTR protocol)
     EnterCriticalSection(&session_cs);
 
     LIST_FOR_EACH_ENTRY(iter, &name_space_list, name_space, entry) {
-        if(iter->cf == cf && !strcmpiW(iter->protocol, protocol)) {
+        if(iter->cf == cf && !wcsicmp(iter->protocol, protocol)) {
             list_remove(&iter->entry);
 
             LeaveCriticalSection(&session_cs);
@@ -171,8 +171,7 @@ BOOL is_registered_protocol(LPCWSTR url)
     WCHAR schema[64];
     HRESULT hres;
 
-    hres = CoInternetParseUrl(url, PARSE_SCHEMA, 0, schema, sizeof(schema)/sizeof(schema[0]),
-            &schema_len, 0);
+    hres = CoInternetParseUrl(url, PARSE_SCHEMA, 0, schema, ARRAY_SIZE(schema), &schema_len, 0);
     if(FAILED(hres))
         return FALSE;
 
@@ -188,8 +187,7 @@ IInternetProtocolInfo *get_protocol_info(LPCWSTR url)
     DWORD schema_len;
     HRESULT hres;
 
-    hres = CoInternetParseUrl(url, PARSE_SCHEMA, 0, schema, sizeof(schema)/sizeof(schema[0]),
-            &schema_len, 0);
+    hres = CoInternetParseUrl(url, PARSE_SCHEMA, 0, schema, ARRAY_SIZE(schema), &schema_len, 0);
     if(FAILED(hres) || !schema_len)
         return NULL;
 
@@ -267,7 +265,7 @@ IInternetProtocol *get_mime_filter(LPCWSTR mime)
     EnterCriticalSection(&session_cs);
 
     LIST_FOR_EACH_ENTRY(iter, &mime_filter_list, mime_filter, entry) {
-        if(!strcmpW(iter->mime, mime)) {
+        if(!wcscmp(iter->mime, mime)) {
             cf = iter->cf;
             break;
         }
@@ -410,7 +408,7 @@ static HRESULT WINAPI InternetSession_UnregisterMimeFilter(IInternetSession *ifa
     EnterCriticalSection(&session_cs);
 
     LIST_FOR_EACH_ENTRY(iter, &mime_filter_list, mime_filter, entry) {
-        if(iter->cf == pCF && !strcmpW(iter->mime, pwzType)) {
+        if(iter->cf == pCF && !wcscmp(iter->mime, pwzType)) {
             list_remove(&iter->entry);
 
             LeaveCriticalSection(&session_cs);
@@ -563,8 +561,8 @@ static void ensure_useragent(void)
     else
         os_type = emptyW;
 
-    sprintfW(buf, formatW, is_nt, info.dwMajorVersion, info.dwMinorVersion, os_type);
-    len = strlenW(buf);
+    swprintf(buf, formatW, is_nt, info.dwMajorVersion, info.dwMinorVersion, os_type);
+    len = lstrlenW(buf);
 
     size = len+40;
     ret = heap_alloc(size * sizeof(WCHAR));
@@ -578,7 +576,7 @@ static void ensure_useragent(void)
         DWORD value_len;
 
         while(1) {
-            value_len = sizeof(buf)/sizeof(WCHAR);
+            value_len = ARRAY_SIZE(buf);
             res = RegEnumValueW(key, idx, buf, &value_len, NULL, NULL, NULL, NULL);
             if(res != ERROR_SUCCESS)
                 break;

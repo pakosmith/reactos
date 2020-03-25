@@ -57,11 +57,12 @@ KSPIN_LOCK MiniportListLock;
 LIST_ENTRY AdapterListHead;
 KSPIN_LOCK AdapterListLock;
 
+#if DBG
 VOID
 MiniDisplayPacket(
-    PNDIS_PACKET Packet)
+    PNDIS_PACKET Packet,
+    PCSTR Reason)
 {
-#if DBG
     ULONG i, Length;
     UCHAR Buffer[64];
     if ((DebugTraceLevel & DEBUG_PACKET) > 0) {
@@ -71,19 +72,19 @@ MiniDisplayPacket(
             0,
             64);
 
-        DbgPrint("*** PACKET START ***");
+        DbgPrint("*** %s PACKET START (%p) ***\n", Reason, Packet);
 
         for (i = 0; i < Length; i++) {
-            if (i % 12 == 0)
+            if (i % 16 == 0)
                 DbgPrint("\n%04X ", i);
             DbgPrint("%02X ", Buffer[i]);
         }
 
-        DbgPrint("*** PACKET STOP ***\n");
+        DbgPrint("\n*** %s PACKET STOP ***\n", Reason);
     }
-#endif /* DBG */
 }
 
+static
 VOID
 MiniDisplayPacket2(
     PVOID  HeaderBuffer,
@@ -91,7 +92,6 @@ MiniDisplayPacket2(
     PVOID  LookaheadBuffer,
     UINT   LookaheadBufferSize)
 {
-#if DBG
     if ((DebugTraceLevel & DEBUG_PACKET) > 0) {
         ULONG i, Length;
         PUCHAR p;
@@ -117,8 +117,8 @@ MiniDisplayPacket2(
 
         DbgPrint("\n*** RECEIVE PACKET STOP ***\n");
     }
-#endif /* DBG */
 }
+#endif /* DBG */
 
 PNDIS_MINIPORT_WORK_ITEM
 MiniGetFirstWorkItem(
@@ -200,7 +200,9 @@ MiniIndicateData(
       "HeaderBufferSize (0x%X)  LookaheadBuffer (0x%X)  LookaheadBufferSize (0x%X).\n",
       Adapter, HeaderBuffer, HeaderBufferSize, LookaheadBuffer, LookaheadBufferSize));
 
+#if DBG
   MiniDisplayPacket2(HeaderBuffer, HeaderBufferSize, LookaheadBuffer, LookaheadBufferSize);
+#endif
 
   NDIS_DbgPrint(MAX_TRACE, ("acquiring miniport block lock\n"));
   KeAcquireSpinLock(&Adapter->NdisMiniportBlock.Lock, &OldIrql);
@@ -624,8 +626,8 @@ MiniAdapterHasAddress(
  */
 {
     UINT Length;
-    PUCHAR Start1;
-    PUCHAR Start2;
+    PUCHAR PacketAddress;
+    PUCHAR AdapterAddress;
     PNDIS_BUFFER NdisBuffer;
     UINT BufferLength;
 
@@ -653,7 +655,7 @@ MiniAdapterHasAddress(
         return FALSE;
     }
 
-    NdisQueryBuffer(NdisBuffer, (PVOID)&Start2, &BufferLength);
+    NdisQueryBuffer(NdisBuffer, (PVOID)&PacketAddress, &BufferLength);
 
     /* FIXME: Should handle fragmented packets */
 
@@ -675,12 +677,12 @@ MiniAdapterHasAddress(
         return FALSE;
     }
 
-    Start1 = (PUCHAR)&Adapter->Address;
+    AdapterAddress = (PUCHAR)&Adapter->Address;
     NDIS_DbgPrint(MAX_TRACE, ("packet address: %x:%x:%x:%x:%x:%x adapter address: %x:%x:%x:%x:%x:%x\n",
-                              *((char *)Start1), *(((char *)Start1)+1), *(((char *)Start1)+2), *(((char *)Start1)+3), *(((char *)Start1)+4), *(((char *)Start1)+5),
-                              *((char *)Start2), *(((char *)Start2)+1), *(((char *)Start2)+2), *(((char *)Start2)+3), *(((char *)Start2)+4), *(((char *)Start2)+5)));
+                              *(PacketAddress), *(PacketAddress+1), *(PacketAddress+2), *(PacketAddress+3), *(PacketAddress+4), *(PacketAddress+5),
+                              *(AdapterAddress), *(AdapterAddress+1), *(AdapterAddress+2), *(AdapterAddress+3), *(AdapterAddress+4), *(AdapterAddress+5)));
 
-    return (RtlCompareMemory((PVOID)Start1, (PVOID)Start2, Length) == Length);
+    return (RtlCompareMemory(PacketAddress, AdapterAddress, Length) == Length);
 }
 
 

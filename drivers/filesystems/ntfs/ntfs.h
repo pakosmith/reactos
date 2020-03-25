@@ -3,12 +3,7 @@
 
 #include <ntifs.h>
 #include <pseh/pseh2.h>
-
-#ifdef __GNUC__
-#define INIT_SECTION __attribute__((section ("INIT")))
-#else
-#define INIT_SECTION /* Done via alloc_text for MSC */
-#endif
+#include <section_attribs.h>
 
 #define CACHEPAGESIZE(pDeviceExt) \
 	((pDeviceExt)->NtfsInfo.UCHARsPerCluster > PAGE_SIZE ? \
@@ -305,6 +300,17 @@ typedef struct
     };
 } NTFS_ATTR_RECORD, *PNTFS_ATTR_RECORD;
 
+typedef struct
+{
+    ULONG Type;
+    USHORT Length;
+    UCHAR NameLength;
+    UCHAR NameOffset;
+    ULONGLONG StartingVCN;
+    ULONGLONG MFTIndex;
+    USHORT Instance;
+} NTFS_ATTRIBUTE_LIST_ITEM, *PNTFS_ATTRIBUTE_LIST_ITEM;
+
 // The beginning and length of an attribute record are always aligned to an 8-byte boundary,
 // relative to the beginning of the file record.
 #define ATTR_RECORD_ALIGNMENT 8
@@ -491,6 +497,7 @@ typedef struct _NTFS_ATTR_CONTEXT
     ULONGLONG            CacheRunCurrentOffset;
     LARGE_MCB           DataRunsMCB;
     ULONGLONG           FileMFTIndex;
+    ULONGLONG           FileOwnerMFTIndex; /* If attribute list attribute, reference the original file */
     PNTFS_ATTR_RECORD    pRecord;
 } NTFS_ATTR_CONTEXT, *PNTFS_ATTR_CONTEXT;
 
@@ -539,8 +546,9 @@ typedef struct _FIND_ATTR_CONTXT
     PNTFS_ATTR_RECORD FirstAttr;
     PNTFS_ATTR_RECORD CurrAttr;
     PNTFS_ATTR_RECORD LastAttr;
-    PNTFS_ATTR_RECORD NonResidentStart;
-    PNTFS_ATTR_RECORD NonResidentEnd;
+    PNTFS_ATTRIBUTE_LIST_ITEM NonResidentStart;
+    PNTFS_ATTRIBUTE_LIST_ITEM NonResidentEnd;
+    PNTFS_ATTRIBUTE_LIST_ITEM NonResidentCur;
     ULONG Offset;
 } FIND_ATTR_CONTXT, *PFIND_ATTR_CONTXT;
 
@@ -663,6 +671,14 @@ GetLastClusterInDataRun(PDEVICE_EXTENSION Vcb,
 PFILENAME_ATTRIBUTE
 GetBestFileNameFromRecord(PDEVICE_EXTENSION Vcb,
                           PFILE_RECORD_HEADER FileRecord);
+
+NTSTATUS
+FindFirstAttributeListItem(PFIND_ATTR_CONTXT Context,
+                           PNTFS_ATTRIBUTE_LIST_ITEM *Item);
+
+NTSTATUS
+FindNextAttributeListItem(PFIND_ATTR_CONTXT Context,
+                          PNTFS_ATTRIBUTE_LIST_ITEM *Item);
 
 NTSTATUS
 FindFirstAttribute(PFIND_ATTR_CONTXT Context,
@@ -1260,8 +1276,10 @@ NtfsSetVolumeInformation(PNTFS_IRP_CONTEXT IrpContext);
 
 /* ntfs.c */
 
+INIT_FUNCTION
 DRIVER_INITIALIZE DriverEntry;
 
+INIT_FUNCTION
 VOID
 NTAPI
 NtfsInitializeFunctionPointers(PDRIVER_OBJECT DriverObject);

@@ -108,7 +108,7 @@ IopGetDriverObject(
     BOOLEAN FileSystem)
 {
     PDRIVER_OBJECT Object;
-    WCHAR NameBuffer[MAX_PATH];
+    UNICODE_STRING Prefix;
     UNICODE_STRING DriverName;
     NTSTATUS Status;
 
@@ -123,14 +123,20 @@ IopGetDriverObject(
         /* We don't know which DriverObject we have to open */
         return STATUS_INVALID_PARAMETER_2;
 
-    DriverName.Buffer = NameBuffer;
-    DriverName.Length = 0;
-    DriverName.MaximumLength = sizeof(NameBuffer);
-
     if (FileSystem != FALSE)
-        RtlAppendUnicodeToString(&DriverName, FILESYSTEM_ROOT_NAME);
+        RtlInitUnicodeString(&Prefix, FILESYSTEM_ROOT_NAME);
     else
-        RtlAppendUnicodeToString(&DriverName, DRIVER_ROOT_NAME);
+        RtlInitUnicodeString(&Prefix, DRIVER_ROOT_NAME);
+
+    DriverName.Length = 0;
+    DriverName.MaximumLength = Prefix.Length + ServiceName->Length + sizeof(UNICODE_NULL);
+    ASSERT(DriverName.MaximumLength > ServiceName->Length);
+    DriverName.Buffer = ExAllocatePoolWithTag(PagedPool, DriverName.MaximumLength, TAG_IO);
+    if (DriverName.Buffer == NULL)
+    {
+        return STATUS_INSUFFICIENT_RESOURCES;
+    }
+    RtlAppendUnicodeStringToString(&DriverName, &Prefix);
     RtlAppendUnicodeStringToString(&DriverName, ServiceName);
 
     DPRINT("Driver name: '%wZ'\n", &DriverName);
@@ -144,6 +150,7 @@ IopGetDriverObject(
                                      KernelMode,
                                      NULL, /* ParseContext */
                                      (PVOID*)&Object);
+    ExFreePoolWithTag(DriverName.Buffer, TAG_IO);
     if (!NT_SUCCESS(Status))
     {
         DPRINT("Failed to reference driver object, status=0x%08x\n", Status);
@@ -713,9 +720,9 @@ MiResolveImageReferences(IN PVOID ImageBase,
 //
 // Used for images already loaded (boot drivers)
 //
+INIT_FUNCTION
 NTSTATUS
 NTAPI
-INIT_FUNCTION
 LdrProcessDriverModule(PLDR_DATA_TABLE_ENTRY LdrEntry,
                        PUNICODE_STRING FileName,
                        PLDR_DATA_TABLE_ENTRY *ModuleObject)
@@ -728,7 +735,9 @@ LdrProcessDriverModule(PLDR_DATA_TABLE_ENTRY LdrEntry,
     PVOID DriverBase = LdrEntry->DllBase;
 
     /* Allocate a buffer we'll use for names */
-    Buffer = ExAllocatePoolWithTag(NonPagedPool, MAX_PATH, TAG_LDR_WSTR);
+    Buffer = ExAllocatePoolWithTag(NonPagedPool,
+                                   MAXIMUM_FILENAME_LENGTH,
+                                   TAG_LDR_WSTR);
     if (!Buffer)
     {
         /* Fail */
@@ -793,9 +802,9 @@ LdrProcessDriverModule(PLDR_DATA_TABLE_ENTRY LdrEntry,
  *
  * Initialize a driver that is already loaded in memory.
  */
+INIT_FUNCTION
 NTSTATUS
 NTAPI
-INIT_FUNCTION
 IopInitializeBuiltinDriver(IN PLDR_DATA_TABLE_ENTRY BootLdrEntry)
 {
     PDEVICE_NODE DeviceNode;
@@ -924,9 +933,9 @@ IopInitializeBuiltinDriver(IN PLDR_DATA_TABLE_ENTRY BootLdrEntry)
  * Return Value
  *    None
  */
+INIT_FUNCTION
 VOID
 FASTCALL
-INIT_FUNCTION
 IopInitializeBootDrivers(VOID)
 {
     PLIST_ENTRY ListHead, NextEntry, NextEntry2;
@@ -1120,9 +1129,9 @@ IopInitializeBootDrivers(VOID)
     InitializeListHead(&KeLoaderBlock->LoadOrderListHead);
 }
 
+INIT_FUNCTION
 VOID
 FASTCALL
-INIT_FUNCTION
 IopInitializeSystemDrivers(VOID)
 {
     PUNICODE_STRING *DriverList, *SavedList;
@@ -1177,6 +1186,7 @@ IopInitializeSystemDrivers(VOID)
 NTSTATUS NTAPI
 IopUnloadDriver(PUNICODE_STRING DriverServiceName, BOOLEAN UnloadPnpDrivers)
 {
+    UNICODE_STRING Backslash = RTL_CONSTANT_STRING(L"\\");
     RTL_QUERY_REGISTRY_TABLE QueryTable[2];
     UNICODE_STRING ImagePath;
     UNICODE_STRING ServiceName;
@@ -1185,36 +1195,80 @@ IopUnloadDriver(PUNICODE_STRING DriverServiceName, BOOLEAN UnloadPnpDrivers)
     PDEVICE_OBJECT DeviceObject;
     PEXTENDED_DEVOBJ_EXTENSION DeviceExtension;
     NTSTATUS Status;
-    PWSTR Start;
+    USHORT LastBackslash;
     BOOLEAN SafeToUnload = TRUE;
-
-    DPRINT("IopUnloadDriver('%wZ', %u)\n", DriverServiceName, UnloadPnpDrivers);
+    KPROCESSOR_MODE PreviousMode;
+    UNICODE_STRING CapturedServiceName;
 
     PAGED_CODE();
+
+    PreviousMode = ExGetPreviousMode();
+
+    /* Need the appropriate priviliege */
+    if (!SeSinglePrivilegeCheck(SeLoadDriverPrivilege, PreviousMode))
+    {
+        DPRINT1("No unload privilege!\n");
+        return STATUS_PRIVILEGE_NOT_HELD;
+    }
+
+    /* Capture the service name */
+    Status = ProbeAndCaptureUnicodeString(&CapturedServiceName, PreviousMode, DriverServiceName);
+    if (!NT_SUCCESS(Status))
+    {
+        return Status;
+    }
+
+    DPRINT("IopUnloadDriver('%wZ', %u)\n", &CapturedServiceName, UnloadPnpDrivers);
+
+
+    /* We need a service name */
+    if (CapturedServiceName.Length == 0)
+    {
+        ReleaseCapturedUnicodeString(&CapturedServiceName, PreviousMode);
+        return STATUS_INVALID_PARAMETER;
+    }
 
     /*
      * Get the service name from the registry key name
      */
-    Start = wcsrchr(DriverServiceName->Buffer, L'\\');
-    if (Start == NULL)
-        Start = DriverServiceName->Buffer;
+    Status = RtlFindCharInUnicodeString(RTL_FIND_CHAR_IN_UNICODE_STRING_START_AT_END,
+                                        &CapturedServiceName,
+                                        &Backslash,
+                                        &LastBackslash);
+    if (NT_SUCCESS(Status))
+    {
+        NT_ASSERT(CapturedServiceName.Length >= LastBackslash + sizeof(WCHAR));
+        ServiceName.Buffer = &CapturedServiceName.Buffer[LastBackslash / sizeof(WCHAR) + 1];
+        ServiceName.Length = CapturedServiceName.Length - LastBackslash - sizeof(WCHAR);
+        ServiceName.MaximumLength = CapturedServiceName.MaximumLength - LastBackslash - sizeof(WCHAR);
+    }
     else
-        Start++;
-
-    RtlInitUnicodeString(&ServiceName, Start);
+    {
+        ServiceName = CapturedServiceName;
+    }
 
     /*
      * Construct the driver object name
      */
-    ObjectName.Length = ((USHORT)wcslen(Start) + 8) * sizeof(WCHAR);
-    ObjectName.MaximumLength = ObjectName.Length + sizeof(WCHAR);
+    Status = RtlUShortAdd(sizeof(DRIVER_ROOT_NAME),
+                          ServiceName.Length,
+                          &ObjectName.MaximumLength);
+    if (!NT_SUCCESS(Status))
+    {
+        ReleaseCapturedUnicodeString(&CapturedServiceName, PreviousMode);
+        return Status;
+    }
+    ObjectName.Length = 0;
     ObjectName.Buffer = ExAllocatePoolWithTag(PagedPool,
                                               ObjectName.MaximumLength,
                                               TAG_IO);
-    if (!ObjectName.Buffer) return STATUS_INSUFFICIENT_RESOURCES;
-    wcscpy(ObjectName.Buffer, DRIVER_ROOT_NAME);
-    memcpy(ObjectName.Buffer + 8, Start, ObjectName.Length - 8 * sizeof(WCHAR));
-    ObjectName.Buffer[ObjectName.Length/sizeof(WCHAR)] = UNICODE_NULL;
+    if (!ObjectName.Buffer)
+    {
+        ReleaseCapturedUnicodeString(&CapturedServiceName, PreviousMode);
+        return STATUS_INSUFFICIENT_RESOURCES;
+    }
+    NT_VERIFY(NT_SUCCESS(RtlAppendUnicodeToString(&ObjectName, DRIVER_ROOT_NAME)));
+    NT_VERIFY(NT_SUCCESS(RtlAppendUnicodeStringToString(&ObjectName, &ServiceName)));
 
     /*
      * Find the driver object
@@ -1232,6 +1286,7 @@ IopUnloadDriver(PUNICODE_STRING DriverServiceName, BOOLEAN UnloadPnpDrivers)
     {
         DPRINT1("Can't locate driver object for %wZ\n", &ObjectName);
         ExFreePoolWithTag(ObjectName.Buffer, TAG_IO);
+        ReleaseCapturedUnicodeString(&CapturedServiceName, PreviousMode);
         return Status;
     }
 
@@ -1243,6 +1298,7 @@ IopUnloadDriver(PUNICODE_STRING DriverServiceName, BOOLEAN UnloadPnpDrivers)
     {
         DPRINT1("Driver deletion pending\n");
         ObDereferenceObject(DriverObject);
+        ReleaseCapturedUnicodeString(&CapturedServiceName, PreviousMode);
         return STATUS_DELETE_PENDING;
     }
 
@@ -1258,10 +1314,13 @@ IopUnloadDriver(PUNICODE_STRING DriverServiceName, BOOLEAN UnloadPnpDrivers)
     QueryTable[0].EntryContext = &ImagePath;
 
     Status = RtlQueryRegistryValues(RTL_REGISTRY_ABSOLUTE,
-                                    DriverServiceName->Buffer,
+                                    CapturedServiceName.Buffer,
                                     QueryTable,
                                     NULL,
                                     NULL);
+
+    /* We no longer need service name */
+    ReleaseCapturedUnicodeString(&CapturedServiceName, PreviousMode);
 
     if (!NT_SUCCESS(Status))
     {
@@ -2057,15 +2116,11 @@ NtLoadDriver(IN PUNICODE_STRING DriverServiceName)
     /*
      * Check security privileges
      */
-
-    /* FIXME: Uncomment when privileges will be correctly implemented. */
-#if 0
     if (!SeSinglePrivilegeCheck(SeLoadDriverPrivilege, PreviousMode))
     {
         DPRINT("Privilege not held\n");
         return STATUS_PRIVILEGE_NOT_HELD;
     }
-#endif
 
     Status = ProbeAndCaptureUnicodeString(&CapturedDriverServiceName,
                                           PreviousMode,

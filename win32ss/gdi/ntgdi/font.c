@@ -293,7 +293,10 @@ FASTCALL
 FontGetObject(PTEXTOBJ plfont, ULONG cjBuffer, PVOID pvBuffer)
 {
     ULONG cjMaxSize;
-    ENUMLOGFONTEXDVW *plf = &plfont->logfont;
+    ENUMLOGFONTEXDVW *plf;
+
+    ASSERT(plfont);
+    plf = &plfont->logfont;
 
     if (!(plfont->fl & TEXTOBJECT_INIT))
     {
@@ -407,7 +410,7 @@ IntGetFontLanguageInfo(PDC Dc)
   pdcattr = Dc->pdcattr;
 
   /* This might need a test for a HEBREW- or ARABIC_CHARSET as well */
-  if ( pdcattr->lTextAlign & TA_RTLREADING )
+  if ( pdcattr->flTextAlign & TA_RTLREADING )
      if( (fontsig.fsCsb[0]&GCP_REORDER_MASK)!=0 )
                     result|=GCP_REORDER;
 
@@ -904,6 +907,11 @@ NtGdiGetOutlineTextMetricsInternalW (HDC  hDC,
      return 0;
   }
   FontGDI = ObjToGDI(TextObj->Font, FONT);
+  if (!(FontGDI->flType & FO_TYPE_TRUETYPE))
+  {
+     TEXTOBJ_UnlockText(TextObj);
+     return 0;
+  }
   TextIntUpdateSize(dc, TextObj, FontGDI, TRUE);
   TEXTOBJ_UnlockText(TextObj);
   Size = IntGetOutlineTextMetrics(FontGDI, 0, NULL);
@@ -920,25 +928,24 @@ NtGdiGetOutlineTextMetricsInternalW (HDC  hDC,
       return 0;
   }
   IntGetOutlineTextMetrics(FontGDI, Size, potm);
-  if (otm)
-  {
-     _SEH2_TRY
-     {
-         ProbeForWrite(otm, Size, 1);
-         RtlCopyMemory(otm, potm, Size);
-     }
-     _SEH2_EXCEPT(EXCEPTION_EXECUTE_HANDLER)
-     {
-         Status = _SEH2_GetExceptionCode();
-     }
-     _SEH2_END
 
-     if (!NT_SUCCESS(Status))
-     {
-        EngSetLastError(ERROR_INVALID_PARAMETER);
-        Size = 0;
-     }
+  _SEH2_TRY
+  {
+      ProbeForWrite(otm, Size, 1);
+      RtlCopyMemory(otm, potm, Size);
   }
+  _SEH2_EXCEPT(EXCEPTION_EXECUTE_HANDLER)
+  {
+      Status = _SEH2_GetExceptionCode();
+  }
+  _SEH2_END
+
+  if (!NT_SUCCESS(Status))
+  {
+     EngSetLastError(ERROR_INVALID_PARAMETER);
+     Size = 0;
+  }
+
   ExFreePoolWithTag(potm,GDITAG_TEXT);
   return Size;
 }
@@ -1081,6 +1088,7 @@ NtGdiGetRealizationInfo(
   }
   pdcattr = pDc->pdcattr;
   pTextObj = RealizeFontInit(pdcattr->hlfntNew);
+  ASSERT(pTextObj != NULL);
   pFontGdi = ObjToGDI(pTextObj->Font, FONT);
   TEXTOBJ_UnlockText(pTextObj);
   DC_UnlockDc(pDc);

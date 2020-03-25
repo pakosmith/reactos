@@ -54,6 +54,7 @@ list(APPEND SOURCE
     platform.c
     ripemd160.c
     rsa.c
+    rsa_internal.c
     sha1.c
     sha256.c
     sha512.c
@@ -78,7 +79,7 @@ list(APPEND SOURCE
     #xtea.c
     )
 
-add_library(mbedtls SHARED
+add_library(mbedtls MODULE
     ${SOURCE}
     mbedtls.rc
     ${CMAKE_CURRENT_BINARY_DIR}/mbedtls.def)

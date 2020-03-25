@@ -110,6 +110,7 @@ typedef struct _USETUP_DATA
     LONG MBRInstallType;
     LONG FormatPartition;
     LONG AutoPartition;
+    LONG FsType;
 
 /* Settings lists *****/
     PGENERIC_LIST ComputerList;
@@ -136,6 +137,8 @@ extern BOOLEAN IsUnattendedSetup;
 
 /* FUNCTIONS ****************************************************************/
 
+#include "substset.h"
+
 VOID
 CheckUnattendedSetup(
     IN OUT PUSETUP_DATA pSetupData);
@@ -158,7 +161,6 @@ NTSTATUS
 InitDestinationPaths(
     IN OUT PUSETUP_DATA pSetupData,
     IN PCWSTR InstallationDir,
-    IN PDISKENTRY DiskEntry,    // FIXME: HACK!
     IN PPARTENTRY PartEntry);   // FIXME: HACK!
 
 // NTSTATUS
@@ -194,6 +196,7 @@ UpdateRegistry(
     /**/IN PPARTLIST PartitionList,      /* HACK HACK! */
     /**/IN WCHAR DestinationDriveLetter, /* HACK HACK! */
     /**/IN PCWSTR SelectedLanguageId,    /* HACK HACK! */
-    IN PREGISTRY_STATUS_ROUTINE StatusRoutine OPTIONAL);
+    IN PREGISTRY_STATUS_ROUTINE StatusRoutine OPTIONAL,
+    IN PFONTSUBSTSETTINGS SubstSettings OPTIONAL);
 
 /* EOF */

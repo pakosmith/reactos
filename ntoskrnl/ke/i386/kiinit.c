@@ -31,7 +31,7 @@ ULONGLONG BootCycles, BootCyclesEnd;
 
 /* FUNCTIONS *****************************************************************/
 
-INIT_SECTION
+INIT_FUNCTION
 VOID
 NTAPI
 KiInitMachineDependent(VOID)
@@ -330,7 +330,7 @@ KiInitMachineDependent(VOID)
     KiSetCR0Bits();
 }
 
-INIT_SECTION
+INIT_FUNCTION
 VOID
 NTAPI
 KiInitializePcr(IN ULONG ProcessorNumber,
@@ -392,7 +392,7 @@ KiInitializePcr(IN ULONG ProcessorNumber,
     Pcr->PrcbData.MultiThreadProcessorSet = Pcr->PrcbData.SetMember;
 }
 
-INIT_SECTION
+INIT_FUNCTION
 VOID
 NTAPI
 KiInitializeKernel(IN PKPROCESS InitProcess,
@@ -588,20 +588,19 @@ KiInitializeKernel(IN PKPROCESS InitProcess,
         if (!DpcStack) KeBugCheckEx(NO_PAGES_AVAILABLE, 1, 0, 0, 0);
         Prcb->DpcStack = DpcStack;
 
-        /* Allocate the IOPM save area. */
+        /* Allocate the IOPM save area */
         Ki386IopmSaveArea = ExAllocatePoolWithTag(PagedPool,
-                                                  PAGE_SIZE * 2,
+                                                  IOPM_SIZE,
                                                   '  eK');
         if (!Ki386IopmSaveArea)
         {
             /* Bugcheck. We need this for V86/VDM support. */
-            KeBugCheckEx(NO_PAGES_AVAILABLE, 2, PAGE_SIZE * 2, 0, 0);
+            KeBugCheckEx(NO_PAGES_AVAILABLE, 2, IOPM_SIZE, 0, 0);
         }
     }
 
     /* Raise to Dispatch */
-    KeRaiseIrql(DISPATCH_LEVEL,
-                &DummyIrql);
+    KeRaiseIrql(DISPATCH_LEVEL, &DummyIrql);
 
     /* Set the Idle Priority to 0. This will jump into Phase 1 */
     KeSetPriorityThread(InitThread, 0);
@@ -612,12 +611,11 @@ KiInitializeKernel(IN PKPROCESS InitProcess,
     KiReleasePrcbLock(Prcb);
 
     /* Raise back to HIGH_LEVEL and clear the PRCB for the loader block */
-    KeRaiseIrql(HIGH_LEVEL,
-                &DummyIrql);
+    KeRaiseIrql(HIGH_LEVEL, &DummyIrql);
     LoaderBlock->Prcb = 0;
 }
 
-INIT_SECTION
+INIT_FUNCTION
 VOID
 FASTCALL
 KiGetMachineBootPointers(IN PKGDTENTRY *Gdt,
@@ -658,7 +656,7 @@ KiGetMachineBootPointers(IN PKGDTENTRY *Gdt,
                               TssSelector.HighWord.Bytes.BaseHi << 24);
 }
 
-INIT_SECTION
+INIT_FUNCTION
 VOID
 NTAPI
 KiSystemStartupBootStack(VOID)
@@ -710,7 +708,7 @@ KiMarkPageAsReadOnly(
     __invlpg(Address);
 }
 
-INIT_SECTION
+INIT_FUNCTION
 VOID
 NTAPI
 KiSystemStartup(IN PLOADER_PARAMETER_BLOCK LoaderBlock)
@@ -835,8 +833,7 @@ AppCpuInit:
     }
 
     /* Raise to HIGH_LEVEL */
-    KeRaiseIrql(HIGH_LEVEL,
-                &DummyIrql);
+    KeRaiseIrql(HIGH_LEVEL, &DummyIrql);
 
     /* Switch to new kernel stack and start kernel bootstrapping */
     KiSwitchToBootStack(InitialStack & ~3);

@@ -5,23 +5,22 @@
 #include <ntdddisk.h>
 #include <dos.h>
 #include <pseh/pseh2.h>
+#include <section_attribs.h>
 #ifdef KDBG
 #include <ndk/kdfuncs.h>
 #include <reactos/kdros.h>
 #endif
 
-#ifdef __GNUC__
-#define INIT_SECTION __attribute__((section ("INIT")))
-#else
-#define INIT_SECTION /* Done via alloc_text for MSC */
-#endif
 
 #define USE_ROS_CC_AND_FS
-#if 0
-#ifndef _MSC_VER
 #define ENABLE_SWAPOUT
-#endif
-#endif
+
+/* FIXME: because volume is not cached, we have to perform direct IOs
+ * The day this is fixed, just comment out that line, and check
+ * it still works (and delete old code ;-))
+ */
+#define VOLUME_IS_NOT_CACHED_WORK_AROUND_IT
+
 
 #define ROUND_DOWN(n, align) \
     (((ULONG)n) & ~((align) - 1l))
@@ -244,6 +243,8 @@ typedef union _DIR_ENTRY DIR_ENTRY, *PDIR_ENTRY;
 #define VCB_IS_SYS_OR_HAS_PAGE  0x0008
 #define VCB_IS_DIRTY            0x4000 /* Volume is dirty */
 #define VCB_CLEAR_DIRTY         0x8000 /* Clean dirty flag at shutdown */
+/* VCB condition state */
+#define VCB_GOOD                0x0010 /* If not set, the VCB is improper for usage */
 
 typedef struct
 {
@@ -326,6 +327,7 @@ typedef struct DEVICE_EXTENSION
     BOOLEAN AvailableClustersValid;
     ULONG Flags;
     struct _VFATFCB *VolumeFcb;
+    struct _VFATFCB *RootFcb;
     PSTATISTICS Statistics;
 
     /* Pointers to functions for manipulating FAT. */
@@ -816,6 +818,7 @@ VfatSetExtendedAttributes(
 
 /* fastio.c */
 
+INIT_FUNCTION
 VOID
 VfatInitFastIoRoutines(
     PFAST_IO_DISPATCH FastIoDispatch);
@@ -1120,6 +1123,7 @@ VfatFileSystemControl(
 
 /* iface.c */
 
+INIT_FUNCTION
 NTSTATUS
 NTAPI
 DriverEntry(
@@ -1144,14 +1148,14 @@ VfatBuildRequest(
 
 PVOID
 VfatGetUserBuffer(
-    IN PIRP,
+    IN PIRP Irp,
     IN BOOLEAN Paging);
 
 NTSTATUS
 VfatLockUserBuffer(
-    IN PIRP,
-    IN ULONG,
-    IN LOCK_OPERATION);
+    IN PIRP Irp,
+    IN ULONG Length,
+    IN LOCK_OPERATION Operation);
 
 BOOLEAN
 VfatCheckForDismount(
@@ -1216,11 +1220,6 @@ vfatSplitPathName(
 BOOLEAN
 vfatIsLongIllegal(
     WCHAR c);
-
-BOOLEAN
-wstrcmpjoki(
-    PWSTR s1,
-    PWSTR s2);
 
 /* volume.c */
 

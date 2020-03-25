@@ -1614,4 +1614,5 @@ NtOpenProcess(OUT PHANDLE ProcessHandle,
     /* Return status */
     return Status;
 }
+
 /* EOF */

@@ -13,6 +13,16 @@
 static const CLASS_AND_INTERFACES ExpectedInterfaces[] =
 {
     {
+        ID_NAME(CLSID_ActiveDesktop),
+        {
+            {    0x0,   &IID_IActiveDesktop },
+            {    0x0,       &IID_IUnknown },
+            {    0x4,   &IID_IActiveDesktopP },
+            {    0x8,   &IID_IADesktopP2 },
+            {    0xc,   &IID_IPropertyBag },
+        }
+    },
+    {
         ID_NAME(CLSID_CDBurn),
         {
             {    0x0,   &IID_IObjectWithSite },
@@ -106,6 +116,19 @@ static const CLASS_AND_INTERFACES ExpectedInterfaces[] =
             {   0x14,   &IID_IOleClientSite },
             {   0x18,   &IID_IOleInPlaceSite },
             {   0x1c,   &IID_IOleControlSite },
+        }
+    },
+    {
+        ID_NAME(CLSID_FindFolder),
+        {
+            {    0x0,   &IID_IShellFolder2 },
+            {    0x0,       &IID_IShellFolder },
+            {    0x0,           &IID_IUnknown },
+            {    0x4,   &IID_IShellIcon },
+            {    0x8,   &IID_IShellIconOverlay },
+            {    0xc,   &IID_IPersistFolder2 },
+            {    0xc,       &IID_IPersistFolder },
+            {    0xc,           &IID_IPersist },
         }
     },
     {

@@ -391,9 +391,9 @@ CmpInitHiveFromFile(IN PCUNICODE_STRING HiveName,
     return STATUS_SUCCESS;
 }
 
+INIT_FUNCTION
 NTSTATUS
 NTAPI
-INIT_FUNCTION
 CmpSetSystemValues(IN PLOADER_PARAMETER_BLOCK LoaderBlock)
 {
     NTSTATUS Status;
@@ -446,9 +446,9 @@ Quit:
     return Status;
 }
 
+INIT_FUNCTION
 static
 NTSTATUS
-INIT_FUNCTION
 CmpCreateHardwareProfile(HANDLE ControlSetHandle)
 {
     OBJECT_ATTRIBUTES ObjectAttributes;
@@ -518,9 +518,9 @@ done:
     return Status;
 }
 
+INIT_FUNCTION
 NTSTATUS
 NTAPI
-INIT_FUNCTION
 CmpCreateControlSet(IN PLOADER_PARAMETER_BLOCK LoaderBlock)
 {
     UNICODE_STRING ConfigName = RTL_CONSTANT_STRING(L"Control\\IDConfigDB");
@@ -859,9 +859,9 @@ CmpLinkHiveToMaster(IN PUNICODE_STRING LinkName,
     return STATUS_SUCCESS;
 }
 
+INIT_FUNCTION
 BOOLEAN
 NTAPI
-INIT_FUNCTION
 CmpInitializeSystemHive(IN PLOADER_PARAMETER_BLOCK LoaderBlock)
 {
     static const UNICODE_STRING HiveName = RTL_CONSTANT_STRING(L"SYSTEM");
@@ -976,9 +976,9 @@ CmpInitializeSystemHive(IN PLOADER_PARAMETER_BLOCK LoaderBlock)
     return TRUE;
 }
 
+INIT_FUNCTION
 NTSTATUS
 NTAPI
-INIT_FUNCTION
 CmpCreateObjectTypes(VOID)
 {
     OBJECT_TYPE_INITIALIZER ObjectTypeInitializer;
@@ -1010,9 +1010,9 @@ CmpCreateObjectTypes(VOID)
     return ObCreateObjectType(&Name, &ObjectTypeInitializer, NULL, &CmpKeyObjectType);
 }
 
+INIT_FUNCTION
 BOOLEAN
 NTAPI
-INIT_FUNCTION
 CmpCreateRootNode(IN PHHIVE Hive,
                   IN PCWSTR Name,
                   OUT PHCELL_INDEX Index)
@@ -1066,9 +1066,9 @@ CmpCreateRootNode(IN PHHIVE Hive,
     return TRUE;
 }
 
+INIT_FUNCTION
 BOOLEAN
 NTAPI
-INIT_FUNCTION
 CmpCreateRegistryRoot(VOID)
 {
     UNICODE_STRING KeyName;
@@ -1166,32 +1166,24 @@ CmpCreateRegistryRoot(VOID)
     return TRUE;
 }
 
-static NTSTATUS
-CmpGetRegistryPath(OUT PWCHAR ConfigPath)
+static PCWSTR
+CmpGetRegistryPath(VOID)
 {
-    /* Just use default path */
-    wcscpy(ConfigPath, L"\\SystemRoot");
+    PCWSTR ConfigPath;
 
     /* Check if we are booted in setup */
     if (!ExpInTextModeSetup)
     {
-        /* Add registry path */
-#if 0
-        ResultSize = wcslen(ConfigPath);
-        if (ResultSize && ConfigPath[ResultSize - 1] == L'\\')
-            ConfigPath[ResultSize - 1] = UNICODE_NULL;
-#endif
-        wcscat(ConfigPath, L"\\System32\\Config\\");
+        ConfigPath = L"\\SystemRoot\\System32\\Config\\";
     }
     else
     {
-        wcscat(ConfigPath, L"\\");
+        ConfigPath = L"\\SystemRoot\\";
     }
 
     DPRINT1("CmpGetRegistryPath: ConfigPath = '%S'\n", ConfigPath);
 
-    /* Done */
-    return STATUS_SUCCESS;
+    return ConfigPath;
 }
 
 _Function_class_(KSTART_ROUTINE)
@@ -1199,7 +1191,8 @@ VOID
 NTAPI
 CmpLoadHiveThread(IN PVOID StartContext)
 {
-    WCHAR FileBuffer[MAX_PATH], RegBuffer[MAX_PATH], ConfigPath[MAX_PATH];
+    WCHAR FileBuffer[64], RegBuffer[64];
+    PCWSTR ConfigPath;
     UNICODE_STRING TempName, FileName, RegName;
     ULONG i, ErrorResponse, WorkerCount, Length;
     USHORT FileStart;
@@ -1222,7 +1215,7 @@ CmpLoadHiveThread(IN PVOID StartContext)
     RtlInitEmptyUnicodeString(&RegName, RegBuffer, sizeof(RegBuffer));
 
     /* Now build the system root path */
-    CmpGetRegistryPath(ConfigPath);
+    ConfigPath = CmpGetRegistryPath();
     RtlInitUnicodeString(&TempName, ConfigPath);
     RtlAppendUnicodeStringToString(&FileName, &TempName);
     FileStart = FileName.Length;
@@ -1364,7 +1357,8 @@ VOID
 NTAPI
 CmpInitializeHiveList(VOID)
 {
-    WCHAR FileBuffer[MAX_PATH], RegBuffer[MAX_PATH], ConfigPath[MAX_PATH];
+    WCHAR FileBuffer[64], RegBuffer[64];
+    PCWSTR ConfigPath;
     UNICODE_STRING TempName, FileName, RegName;
     HANDLE Thread;
     NTSTATUS Status;
@@ -1381,7 +1375,7 @@ CmpInitializeHiveList(VOID)
     RtlInitEmptyUnicodeString(&RegName, RegBuffer, sizeof(RegBuffer));
 
     /* Now build the system root path */
-    CmpGetRegistryPath(ConfigPath);
+    ConfigPath = CmpGetRegistryPath();
     RtlInitUnicodeString(&TempName, ConfigPath);
     RtlAppendUnicodeStringToString(&FileName, &TempName);
 
@@ -1511,9 +1505,9 @@ CmpInitializeHiveList(VOID)
     CmpNoVolatileCreates = TRUE;
 }
 
+INIT_FUNCTION
 BOOLEAN
 NTAPI
-INIT_FUNCTION
 CmInitSystem1(VOID)
 {
     OBJECT_ATTRIBUTES ObjectAttributes;
@@ -1727,9 +1721,9 @@ CmInitSystem1(VOID)
     return TRUE;
 }
 
+INIT_FUNCTION
 VOID
 NTAPI
-INIT_FUNCTION
 CmpFreeDriverList(IN PHHIVE Hive,
                   IN PLIST_ENTRY DriverList)
 {
@@ -1776,9 +1770,9 @@ CmpFreeDriverList(IN PHHIVE Hive,
     }
 }
 
+INIT_FUNCTION
 PUNICODE_STRING*
 NTAPI
-INIT_FUNCTION
 CmGetSystemDriverList(VOID)
 {
     LIST_ENTRY DriverList;

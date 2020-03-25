@@ -66,6 +66,7 @@ BEGIN
         MENUITEM SEPARATOR
         MENUITEM "C&ouper", IDM_CUT
         MENUITEM "&Copier", IDM_COPY
+        MENUITEM "Paste", IDM_INSERT
         MENUITEM SEPARATOR
         MENUITEM "Créer un &lien", IDM_CREATELINK
         MENUITEM "&Supprimer", IDM_DELETE
@@ -94,7 +95,7 @@ FONT 8, "MS Shell Dlg"
 BEGIN
     DEFPUSHBUTTON "OK", 1, 80, 176, 50, 12, BS_DEFPUSHBUTTON | WS_GROUP | WS_TABSTOP
     PUSHBUTTON "Annuler", 2, 134, 176, 50, 12, WS_GROUP | WS_TABSTOP
-    LTEXT "", IDC_BROWSE_FOR_FOLDER_TITLE, 4, 4, 180, 12
+    LTEXT "", IDC_BROWSE_FOR_FOLDER_TITLE, 4, 4, 180, 24
     LTEXT "", IDC_BROWSE_FOR_FOLDER_STATUS, 4, 25, 180, 12
     CONTROL "", IDC_BROWSE_FOR_FOLDER_TREEVIEW, "SysTreeView32", TVS_HASBUTTONS | TVS_HASLINES | TVS_LINESATROOT | WS_BORDER | WS_TABSTOP, 4, 40, 180, 120
 END
@@ -134,11 +135,7 @@ FONT 8, "MS Shell Dlg"
 BEGIN
     ICON "", IDC_ABOUT_ICON, 7, 55, 21, 20
     LTEXT "", IDC_ABOUT_APPNAME, 35, 55, 200, 10
-    LTEXT "Version ", IDC_STATIC, 35, 65, 28, 10
-    LTEXT KERNEL_VERSION_STR, IDC_STATIC, 63, 65, 27, 10
-    LTEXT " (", IDC_STATIC, 90, 65, 5, 10
-    LTEXT KERNEL_VERSION_BUILD_STR, IDC_STATIC, 95, 65, 58, 10
-    LTEXT ")", IDC_STATIC, 153, 65, 5, 10
+    LTEXT "", IDC_ABOUT_VERSION, 35, 65, 250, 10
     LTEXT "Copyright 1998-", IDC_STATIC, 35, 75, 53, 10
     LTEXT COPYRIGHT_YEAR, IDC_STATIC, 88, 75, 17, 10
     LTEXT " ReactOS Team\0", IDC_STATIC, 105, 75, 53, 10
@@ -167,7 +164,7 @@ CAPTION "Exécuter"
 FONT 8, "MS Shell Dlg"
 BEGIN
     ICON "", IDC_RUNDLG_ICON, 7, 11, 18, 20, WS_VISIBLE
-    LTEXT "Entrez le nom d'un programme, d'un dossier, d'un document ou d'une ressource Internet, et ReactOS l'ouvrira pour vous.", 12289, 36, 4, 182, 26
+    LTEXT "Entrez le nom d'un programme, d'un dossier, d'un document ou d'une ressource Internet, et ReactOS l'ouvrira pour vous.", 12289, 36, 4, 185, 26
     LTEXT "&Ouvrir :", 12305, 7, 39, 26, 10
     CONTROL "", IDC_RUNDLG_EDITPATH, "COMBOBOX", WS_TABSTOP | WS_GROUP | WS_VSCROLL | WS_VISIBLE | CBS_AUTOHSCROLL | CBS_DROPDOWN, 36, 37, 184, 100
     DEFPUSHBUTTON "OK", IDOK, 62, 70, 50, 14, WS_TABSTOP
@@ -213,8 +210,8 @@ BEGIN
     CHECKBOX "Exécuter avec des droits différents", IDC_SHORTEX_RUN_DIFFERENT, 25, 50, 150, 10
     LTEXT "Cette option peut vous permettre d'utiliser ce raccourci en tant qu'autre utilisateur ou de continuer vous-même en protégeant votre ordinateur et vos données des activés de programme non autorisées.", -1, 50, 60, 175, 40
     CHECKBOX "Lancer dans un espace mémoire séparé", IDC_SHORTEX_RUN_SEPARATE, 25, 100, 150, 10, WS_DISABLED
-    PUSHBUTTON "OK", 1, 63, 124, 50, 15, WS_VISIBLE
-    PUSHBUTTON "Annuler", 2, 120, 124, 50, 15, WS_VISIBLE
+    PUSHBUTTON "OK", IDOK, 63, 124, 50, 15, WS_VISIBLE
+    PUSHBUTTON "Annuler", IDCANCEL, 120, 124, 50, 15, WS_VISIBLE
 END
 
 IDD_FOLDER_PROPERTIES DIALOGEX 0, 0, 240, 205
@@ -259,7 +256,7 @@ BEGIN
     LTEXT "Ouvrir avec :", 14006, 8, 53, 50, 10
     ICON "", 14025, 58, 52, 11, 10, NOT WS_VISIBLE
     PUSHBUTTON "&Changer...", 14024, 168, 50, 60, 14, WS_CHILD | WS_VISIBLE | WS_TABSTOP
-    EDITTEXT 14007, 58, 53, 170, 10, ES_LEFT | ES_READONLY | NOT WS_BORDER | ES_AUTOHSCROLL | NOT WS_TABSTOP
+    EDITTEXT 14007, 58, 53, 100, 10, ES_LEFT | ES_READONLY | NOT WS_BORDER | ES_AUTOHSCROLL | NOT WS_TABSTOP
     LTEXT "", -1, 8, 68, 221, 1, SS_ETCHEDHORZ | WS_CHILD | WS_VISIBLE
     LTEXT "Localisation :", 14008, 8, 75, 45, 10
     EDITTEXT 14009, 58, 75, 170, 10, ES_LEFT | ES_READONLY | NOT WS_BORDER | ES_AUTOHSCROLL | NOT WS_TABSTOP
@@ -384,7 +381,7 @@ STYLE DS_SHELLFONT | WS_CHILD | WS_DISABLED | WS_CAPTION
 CAPTION "Propriétés de la corbeille"
 FONT 8, "MS Shell Dlg", 0, 0, 0x0
 BEGIN
-    CONTROL "", 14000, "SysListView32", LVS_REPORT | LVS_SHAREIMAGELISTS | WS_BORDER | WS_TABSTOP, 10, 10, 220, 50
+    CONTROL "", 14000, "SysListView32", LVS_REPORT | LVS_SHOWSELALWAYS | LVS_SHAREIMAGELISTS | WS_BORDER | WS_TABSTOP, 10, 10, 220, 50
     GROUPBOX "Paramètres pour la localisation sélectionnée", -1, 10, 72, 220, 70
     RADIOBUTTON "Taille personnalisée :", 14001, 20, 90, 80, 10, WS_TABSTOP
     EDITTEXT 14002, 106, 87, 50, 14, WS_TABSTOP | ES_NUMBER
@@ -437,13 +434,13 @@ CAPTION "Affichage"
 FONT 8, "MS Shell Dlg", 0, 0, 0x0
 BEGIN
     GROUPBOX "Affichage des dossiers", -1, 7, 10, 249, 60
-    ICON IDI_SHELL_PROGRAMS_FOLDER2, IDC_STATIC, 20, 20, 21, 20
-    LTEXT "Vous pouvez appliquer l'affichage (tel que Détails ou Miniatures) que\nvous utilisez pour ce dossier à tous les dossiers.", -1, 60, 20, 180, 20
-    PUSHBUTTON "Appliquer à tous les dossiers", IDC_VIEW_APPLY_TO_ALL, 60, 50, 80, 14, WS_TABSTOP
-    PUSHBUTTON "&Réinitialiser tous les dossiers", IDC_VIEW_RESET_ALL, 150, 50, 80, 14, WS_TABSTOP
+    ICON IDI_SHELL_PROGRAMS_FOLDER2, IDC_STATIC, 12, 20, 20, 20
+    LTEXT "Vous pouvez appliquer l'affichage (tel que Détails ou Miniatures) que vous utilisez pour ce dossier à tous les dossiers.", -1, 40, 20, 213, 26
+    PUSHBUTTON "Appliquer à tous les dossiers", IDC_VIEW_APPLY_TO_ALL, 15, 50, 116, 14, WS_TABSTOP
+    PUSHBUTTON "&Réinitialiser tous les dossiers", IDC_VIEW_RESET_ALL, 135, 50, 114, 14, WS_TABSTOP
     LTEXT "Paramètres avancés :", -1, 7, 80, 100, 10
     CONTROL "", IDC_VIEW_TREEVIEW, "SysTreeView32", WS_BORDER | WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_TABSTOP | TVS_DISABLEDRAGDROP | TVS_LINESATROOT, 7, 90, 249, 120
-    PUSHBUTTON "Paramètres par &défaut", IDC_VIEW_RESTORE_DEFAULTS, 177, 215, 80, 14, WS_TABSTOP
+    PUSHBUTTON "Paramètres par &défaut", IDC_VIEW_RESTORE_DEFAULTS, 175, 215, 82, 14, WS_TABSTOP
 END
 
 IDD_FOLDER_OPTIONS_FILETYPES DIALOGEX 0, 0, 264, 256
@@ -750,6 +747,9 @@ BEGIN
     IDS_FONTS_DESCRIPTION "Add, change, and manage fonts on your computer."
     IDS_PRINTERS_DESCRIPTION "Shows installed printers and fax printers and helps you add new ones."
 
+    /* About shell dialog version string */
+    IDS_ABOUT_VERSION_STRING "Version %S (%S)"
+
     /* context menus */
     IDS_VIEW_LARGE "&Grandes icônes"
     IDS_VIEW_SMALL "&Petites icônes"
@@ -768,6 +768,17 @@ BEGIN
     IDS_PASTE "Insérer"
     IDS_EJECT "Éjecter"
     IDS_DISCONNECT "Déconnecter"
+    IDS_OPENFILELOCATION "Ouvrir l'empla&cement du fichier"
+    IDS_DESKLINK "Bureau (Créer un raccourci)"
+    IDS_SENDTO_MENU "Envo&yer vers"
+
+    IDS_MOVEERRORTITLE "Erreur lors du déplacement du fichier ou du dossier"
+    IDS_COPYERRORTITLE "Erreur lors de la copie du fichier ou du dossier"
+    IDS_MOVEERRORSAMEFOLDER "Impossible de déplacer '%s' : Le dossier de destination est identique au dossier source."
+    IDS_MOVEERRORSAME "Impossible de déplacer '%s' : Les noms des fichiers source et destination sont identiques."
+    IDS_COPYERRORSAME "Impossible de copier '%s' : Les noms des fichiers source et destination sont identiques."
+    IDS_MOVEERRORSUBFOLDER "Impossible de déplacer '%s' : Le dossier de destination est un sous-dossier du dossier source."
+    IDS_COPYERRORSUBFOLDER "Impossible de copier '%s' : Le dossier de destination est un sous-dossier du dossier source."
 
     IDS_CREATEFOLDER_DENIED "Impossible de créer le dossier '%1'"
     IDS_CREATEFOLDER_CAPTION "Impossible de créer un dossier"
@@ -796,6 +807,11 @@ BEGIN
     IDS_RESTART_PROMPT "Voulez-vous redémarrer votre ordinateur ?"
     IDS_SHUTDOWN_TITLE "Arrêter"
     IDS_SHUTDOWN_PROMPT "Voulez-vous fermer la session ReactOS ?"
+    
+    /* Format Dialog Strings */
+    IDS_FORMAT_TITLE "Format Local Disk"
+    IDS_FORMAT_WARNING "WARNING: Formatting will erase ALL data on this disk.\nTo format the disk, click OK. To quit, click CANCEL."
+    IDS_FORMAT_COMPLETE "Format Complete."
 
     /* Run File dialog */
     IDS_RUNDLG_ERROR "Impossible d'afficher la boîte de dialogue pour l'exécution d'un fichier (erreur interne)"
@@ -803,13 +819,13 @@ BEGIN
     IDS_RUNDLG_BROWSE_CAPTION "Parcourir"
     IDS_RUNDLG_BROWSE_FILTER "Fichiers exécutables (*.exe)\0*.exe\0Tous les fichiers (*.*)\0*.*\0"
 
-    /* shell folder path default values */
+    /* Shell folder path default values. See also: dll/win32/userenv/lang */
     IDS_PROGRAMS "Menu Démarrer\\Programmes"
     IDS_PERSONAL "Mes documents"
     IDS_FAVORITES "Favoris"
     IDS_STARTUP "Menu Démarrer\\Programmes\\Démarrage"
-    IDS_RECENT "Recent"
-    IDS_SENDTO "SendTo"
+    IDS_RECENT "Récent"
+    IDS_SENDTO "Envoyer vers"
     IDS_STARTMENU "Menu Démarrer"
     IDS_MYMUSIC "Ma musique"
     IDS_MYVIDEO "Mes vidéos"
@@ -866,6 +882,7 @@ BEGIN
     IDS_CANTEJECTMEDIA "Impossible d'éjecter le média (code d'erreur : %lu)."
     IDS_CANTSHOWPROPERTIES "Impossible de montrer les propriétés (code d'erreur : %lu)."
     IDS_CANTDISCONNECT "Impossible de déconnecter (code d'erreur : %lu)."
+    IDS_NONE "(aucun)"
 
     /* Friendly File Type Names */
     IDS_DIRECTORY "Dossier"
@@ -902,6 +919,7 @@ BEGIN
     IDS_EDIT_VERB "Éditer"
     IDS_FIND_VERB "Chercher"
     IDS_PRINT_VERB "Imprimer"
+    IDS_CMD_VERB "Command Prompt here"
 
     IDS_FILE_FOLDER "%u fichiers, %u répertoires"
     IDS_PRINTERS "Imprimantes"

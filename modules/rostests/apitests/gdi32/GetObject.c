@@ -7,6 +7,8 @@
 
 #include "precomp.h"
 
+#define INVALID_POINTER ((PVOID)(ULONG_PTR)0xdeadbeefdeadbeefULL)
+
 void
 Test_General(void)
 {
@@ -124,21 +126,21 @@ Test_General(void)
 
     /* Test invalid buffer */
     SetLastError(0xbadbad00);
-    ok(GetObjectA(GetStockObject(WHITE_BRUSH), sizeof(LOGBRUSH), (PVOID)0xc0000000) == 0, "\n");
+    ok(GetObjectA(GetStockObject(WHITE_BRUSH), sizeof(LOGBRUSH), INVALID_POINTER) == 0, "\n");
     ok((GetLastError() == 0xbadbad00) || (GetLastError() == ERROR_NOACCESS), "wrong error: %ld\n", GetLastError());
     SetLastError(0xbadbad00);
-    ok(GetObjectW(GetStockObject(BLACK_PEN), sizeof(LOGPEN), (PVOID)0xc0000000) == 0, "\n");
+    ok(GetObjectW(GetStockObject(BLACK_PEN), sizeof(LOGPEN), INVALID_POINTER) == 0, "\n");
     ok((GetLastError() == 0xbadbad00) || (GetLastError() == ERROR_NOACCESS), "wrong error: %ld\n", GetLastError());
     SetLastError(0xbadbad00);
-    ok(GetObjectW(GetStockObject(21), sizeof(BITMAP), (PVOID)0xc0000000) == 0, "\n");
+    ok(GetObjectW(GetStockObject(21), sizeof(BITMAP), INVALID_POINTER) == 0, "\n");
     ok((GetLastError() == 0xbadbad00) || (GetLastError() == ERROR_NOACCESS), "wrong error: %ld\n", GetLastError());
     SetLastError(0xbadbad00);
-    ok(GetObjectW(GetStockObject(SYSTEM_FONT), sizeof(LOGFONT), (PVOID)0xc0000000) == 0, "\n");
+    ok(GetObjectW(GetStockObject(SYSTEM_FONT), sizeof(LOGFONT), INVALID_POINTER) == 0, "\n");
     ok(GetLastError() == 0xbadbad00, "wrong error: %ld\n", GetLastError());
     SetLastError(ERROR_SUCCESS);
     _SEH2_TRY
     {
-        ret = GetObjectA(GetStockObject(SYSTEM_FONT), sizeof(LOGFONT), (PVOID)0xc0000000);
+        ret = GetObjectA(GetStockObject(SYSTEM_FONT), sizeof(LOGFONT), INVALID_POINTER);
     }
     _SEH2_EXCEPT(EXCEPTION_EXECUTE_HANDLER)
     {
@@ -155,7 +157,7 @@ Test_General(void)
     SetLastError(0xbadbad00);
     hBrush = CreateSolidBrush(123);
     ok(hBrush != NULL, "Failed to create brush\n");
-    ok_long(GetObjectA(hBrush, 0, &TestStruct), sizeof(LOGBRUSH));
+    ok_long(GetObjectA(hBrush, 0, &TestStruct), 0);
     ok_err(0xbadbad00);
     DeleteObject(hBrush);
     SetLastError(0xbadbad00);

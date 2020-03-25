@@ -39,8 +39,8 @@ extern NTSTATUS MiRosTrimCache(ULONG Target, ULONG Priority, PULONG NrFreed);
 // Helper function to create initial memory areas.
 // The created area is always read/write.
 //
-VOID
 INIT_FUNCTION
+VOID
 NTAPI
 MiCreateArm3StaticMemoryArea(PVOID BaseAddress, SIZE_T Size, BOOLEAN Executable)
 {
@@ -61,8 +61,8 @@ MiCreateArm3StaticMemoryArea(PVOID BaseAddress, SIZE_T Size, BOOLEAN Executable)
     // TODO: Perhaps it would be  prudent to bugcheck here, not only assert?
 }
 
-VOID
 INIT_FUNCTION
+VOID
 NTAPI
 MiInitSystemMemoryAreas(VOID)
 {
@@ -117,9 +117,9 @@ MiInitSystemMemoryAreas(VOID)
 #endif /* _X86_ */
 }
 
+INIT_FUNCTION
 VOID
 NTAPI
-INIT_FUNCTION
 MiDbgDumpAddressSpace(VOID)
 {
     //
@@ -169,9 +169,9 @@ MiDbgDumpAddressSpace(VOID)
             "Non Paged Pool Expansion PTE Space");
 }
 
+INIT_FUNCTION
 NTSTATUS
 NTAPI
-INIT_FUNCTION
 MmInitBsmThread(VOID)
 {
     NTSTATUS Status;
@@ -193,9 +193,9 @@ MmInitBsmThread(VOID)
     return Status;
 }
 
+INIT_FUNCTION
 BOOLEAN
 NTAPI
-INIT_FUNCTION
 MmInitSystem(IN ULONG Phase,
              IN PLOADER_PARAMETER_BLOCK LoaderBlock)
 {
@@ -203,6 +203,8 @@ MmInitSystem(IN ULONG Phase,
     PMMPTE PointerPte;
     MMPTE TempPte = ValidKernelPte;
     PFN_NUMBER PageFrameNumber;
+    PLIST_ENTRY ListEntry;
+    PLDR_DATA_TABLE_ENTRY DataTableEntry;
 
     /* Initialize the kernel address space */
     ASSERT(Phase == 1);
@@ -270,6 +272,18 @@ MmInitSystem(IN ULONG Phase,
 
     /* Initialize the balance set manager */
     MmInitBsmThread();
+
+    /* Loop the boot loaded images */
+    for (ListEntry = PsLoadedModuleList.Flink;
+         ListEntry != &PsLoadedModuleList;
+         ListEntry = ListEntry->Flink)
+    {
+        /* Get the data table entry */
+        DataTableEntry = CONTAINING_RECORD(ListEntry, LDR_DATA_TABLE_ENTRY, InLoadOrderLinks);
+
+        /* Set up the image protection */
+        MiWriteProtectSystemImage(DataTableEntry->DllBase);
+    }
 
     return TRUE;
 }

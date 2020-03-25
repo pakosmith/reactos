@@ -10,6 +10,11 @@ add_definitions(
 include_directories(${REACTOS_SOURCE_DIR}/sdk/include/reactos/wine)
 spec2def(crypt32.dll crypt32.spec ADD_IMPORTLIB)
 
+if(MSVC)
+    # error C4312: 'type cast': conversion from 'unsigned int' to 'void *' of greater size
+    replace_compile_flags("/we4312" " ")
+endif()
+
 list(APPEND SOURCE
     base64.c
     cert.c
@@ -37,7 +42,7 @@ list(APPEND SOURCE
     str.c
     precomp.h)
 
-add_library(crypt32 SHARED
+add_library(crypt32 MODULE
     ${SOURCE}
     crypt32.rc
     ${CMAKE_CURRENT_BINARY_DIR}/crypt32_stubs.c

@@ -23,7 +23,7 @@
 #ifndef __SYSSETUP_H_INCLUDED__
 #define __SYSSETUP_H_INCLUDED__
 
-
+// See also dll/cpl/timedate/timezone.c
 typedef struct _TZ_INFO
 {
     LONG Bias;
@@ -43,6 +43,12 @@ typedef struct _TIMEZONE_ENTRY
     TZ_INFO TimezoneInfo;    /* 'TZI' */
     ULONG Index;
 } TIMEZONE_ENTRY, *PTIMEZONE_ENTRY;
+
+typedef enum _PRODUCT_OPTION
+{
+    PRODUCT_OPTION_SERVER,
+    PRODUCT_OPTION_WORKSTATION
+} PRODUCT_OPTION, *PPRODUCT_OPTION;
 
 /* Private Setup data shared between syssetup.dll and netshell.dll */
 typedef struct _SETUPDATA
@@ -71,6 +77,8 @@ typedef struct _SETUPDATA
 
     UINT uFirstNetworkWizardPage;
     UINT uPostNetworkWizardPage;
+
+    PRODUCT_OPTION ProductOption;
 } SETUPDATA, *PSETUPDATA;
 
 

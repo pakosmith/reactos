@@ -52,6 +52,7 @@ SetConsoleHardwareState(PCONSRV_CONSOLE Console, ULONG ConsoleHwState)
 }
 #endif
 
+/* API_NUMBER: ConsolepGetHardwareState */
 CSR_API(SrvGetConsoleHardwareState)
 {
 #if 0
@@ -82,6 +83,7 @@ CSR_API(SrvGetConsoleHardwareState)
 #endif
 }
 
+/* API_NUMBER: ConsolepSetHardwareState */
 CSR_API(SrvSetConsoleHardwareState)
 {
 #if 0
@@ -113,6 +115,7 @@ CSR_API(SrvSetConsoleHardwareState)
 #endif
 }
 
+/* API_NUMBER: ConsolepGetDisplayMode */
 CSR_API(SrvGetConsoleDisplayMode)
 {
     NTSTATUS Status;
@@ -129,6 +132,7 @@ CSR_API(SrvGetConsoleDisplayMode)
     return STATUS_SUCCESS;
 }
 
+/* API_NUMBER: ConsolepSetDisplayMode */
 CSR_API(SrvSetConsoleDisplayMode)
 {
     NTSTATUS Status;
@@ -159,6 +163,7 @@ CSR_API(SrvSetConsoleDisplayMode)
     return Status;
 }
 
+/* API_NUMBER: ConsolepGetLargestWindowSize */
 CSR_API(SrvGetLargestConsoleWindowSize)
 {
     NTSTATUS Status;
@@ -186,6 +191,7 @@ CSR_API(SrvGetLargestConsoleWindowSize)
     return STATUS_SUCCESS;
 }
 
+/* API_NUMBER: ConsolepShowCursor */
 CSR_API(SrvShowConsoleCursor)
 {
     NTSTATUS Status;
@@ -208,6 +214,7 @@ CSR_API(SrvShowConsoleCursor)
     return STATUS_SUCCESS;
 }
 
+/* API_NUMBER: ConsolepSetCursor */
 CSR_API(SrvSetConsoleCursor)
 {
     NTSTATUS Status;
@@ -234,6 +241,7 @@ CSR_API(SrvSetConsoleCursor)
     return (Success ? STATUS_SUCCESS : STATUS_UNSUCCESSFUL);
 }
 
+/* API_NUMBER: ConsolepMenuControl */
 CSR_API(SrvConsoleMenuControl)
 {
     NTSTATUS Status;
@@ -258,6 +266,7 @@ CSR_API(SrvConsoleMenuControl)
     return STATUS_SUCCESS;
 }
 
+/* API_NUMBER: ConsolepSetMenuClose */
 CSR_API(SrvSetConsoleMenuClose)
 {
     NTSTATUS Status;
@@ -275,6 +284,43 @@ CSR_API(SrvSetConsoleMenuClose)
     return (Success ? STATUS_SUCCESS : STATUS_UNSUCCESSFUL);
 }
 
+/* Used by USERSRV!SrvGetThreadConsoleDesktop() */
+NTSTATUS
+NTAPI
+GetThreadConsoleDesktop(
+    IN ULONG_PTR ThreadId,
+    OUT HDESK* ConsoleDesktop)
+{
+    NTSTATUS Status;
+    PCSR_THREAD CsrThread;
+    PCONSRV_CONSOLE Console;
+
+    /* No console desktop handle by default */
+    *ConsoleDesktop = NULL;
+
+    /* Retrieve and lock the thread */
+    Status = CsrLockThreadByClientId(ULongToHandle(ThreadId), &CsrThread);
+    if (!NT_SUCCESS(Status))
+        return Status;
+
+    ASSERT(CsrThread->Process);
+
+    /* Retrieve the console to which the process is attached, and unlock the thread */
+    Status = ConSrvGetConsole(ConsoleGetPerProcessData(CsrThread->Process),
+                              &Console, TRUE);
+    CsrUnlockThread(CsrThread);
+
+    if (!NT_SUCCESS(Status))
+        return Status;
+
+    /* Retrieve the console desktop handle, and release the console */
+    *ConsoleDesktop = TermGetThreadConsoleDesktop(Console);
+    ConSrvReleaseConsole(Console, TRUE);
+
+    return STATUS_SUCCESS;
+}
+
+/* API_NUMBER: ConsolepGetConsoleWindow */
 CSR_API(SrvGetConsoleWindow)
 {
     NTSTATUS Status;
@@ -291,6 +337,7 @@ CSR_API(SrvGetConsoleWindow)
     return STATUS_SUCCESS;
 }
 
+/* API_NUMBER: ConsolepSetIcon */
 CSR_API(SrvSetConsoleIcon)
 {
     NTSTATUS Status;
@@ -309,6 +356,7 @@ CSR_API(SrvSetConsoleIcon)
     return Status;
 }
 
+/* API_NUMBER: ConsolepGetSelectionInfo */
 CSR_API(SrvGetConsoleSelectionInfo)
 {
     NTSTATUS Status;
@@ -327,8 +375,7 @@ CSR_API(SrvGetConsoleSelectionInfo)
     return Status;
 }
 
-
-
+/* API_NUMBER: ConsolepGetNumberOfFonts */
 CSR_API(SrvGetConsoleNumberOfFonts)
 {
     NTSTATUS Status;
@@ -348,6 +395,7 @@ CSR_API(SrvGetConsoleNumberOfFonts)
     return STATUS_SUCCESS;
 }
 
+/* API_NUMBER: ConsolepGetFontInfo */
 CSR_API(SrvGetConsoleFontInfo)
 {
     NTSTATUS Status;
@@ -372,6 +420,7 @@ CSR_API(SrvGetConsoleFontInfo)
     return STATUS_SUCCESS;
 }
 
+/* API_NUMBER: ConsolepGetFontSize */
 CSR_API(SrvGetConsoleFontSize)
 {
     NTSTATUS Status;
@@ -395,6 +444,7 @@ CSR_API(SrvGetConsoleFontSize)
     return STATUS_SUCCESS;
 }
 
+/* API_NUMBER: ConsolepGetCurrentFont */
 CSR_API(SrvGetConsoleCurrentFont)
 {
     NTSTATUS Status;
@@ -419,6 +469,7 @@ CSR_API(SrvGetConsoleCurrentFont)
     return STATUS_SUCCESS;
 }
 
+/* API_NUMBER: ConsolepSetFont */
 CSR_API(SrvSetConsoleFont)
 {
     NTSTATUS Status;

@@ -9,7 +9,10 @@
 
 #define NDEBUG
 #include <debug.h>
+#include <stdio.h>
 #include <shellutils.h>
+
+#define INVALID_POINTER ((PVOID)(ULONG_PTR)0xdeadbeefdeadbeefULL)
 
 static
 VOID
@@ -55,14 +58,14 @@ VOID TestInitialize(_In_ IShellFolder2 *psf2)
     hr = ppf2->Initialize(NULL);
     ok(hr == S_OK, "hr = %lx\n", hr);
 
-    hr = ppf2->Initialize((LPCITEMIDLIST)0xdeaddead);
+    hr = ppf2->Initialize((LPCITEMIDLIST)INVALID_POINTER);
     ok(hr == S_OK, "hr = %lx\n", hr);
 
     //crashes in xp
     //hr = ppf2->GetCurFolder(NULL);
     //ok(hr == E_INVALIDARG, "hr = %lx\n", hr);
 
-    LPITEMIDLIST pidl;
+    CComHeapPtr<ITEMIDLIST> pidl;
     hr = ppf2->GetCurFolder(&pidl);
     ok(hr == S_OK, "hr = %lx\n", hr);
     // 0 in win10, 14 in xp

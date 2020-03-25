@@ -180,6 +180,9 @@ ok(tmp === "undefined", "typeof((new Object).doesnotexist = " + tmp);
 tmp = typeof(testObj.onlyDispID);
 ok(tmp === "unknown", "typeof(testObj.onlyDispID) = " + tmp);
 
+ok("\0\0x\0\0".length === 5, "\"\\0\\0x\\0\\0\".length = " + "\0\0x\0\0".length);
+ok("\0\0x\0\0" === String.fromCharCode(0) + "\0x\0" + String.fromCharCode(0), "\"\\0\\0x\\0\\0\" unexpected");
+
 ok(testFunc1(true, "test") === true, "testFunc1 not returned true");
 
 ok(testFunc1.arguments === null, "testFunc1.arguments = " + testFunc1.arguments);
@@ -479,6 +482,20 @@ var obj3 = { prop1: 1,  prop2: typeof(false) };
 ok(obj3.prop1 === 1, "obj3.prop1 is not 1");
 ok(obj3.prop2 === "boolean", "obj3.prop2 is not \"boolean\"");
 ok(obj3.constructor === Object, "unexpected obj3.constructor");
+
+if(invokeVersion >= 2) {
+    eval("tmp = {prop: 'value',}");
+    ok(tmp.prop === "value", "tmp.prop = " + tmp.prop);
+    eval("tmp = {prop: 'value',second:2,}");
+    ok(tmp.prop === "value", "tmp.prop = " + tmp.prop);
+}else {
+    try {
+        eval("tmp = {prop: 'value',}");
+    }catch(e) {
+        tmp = true;
+    }
+    ok(tmp === true, "exception not fired");
+}
 
 {
     var blockVar = 1;
@@ -1146,6 +1163,27 @@ case 3:
     })();
     expect(ret, "ret");
     expect(x, "try,try2,finally2,finally,ret");
+
+    ret = (function() {
+        try {
+            return "try";
+            unreachable();
+        }catch(e) {
+            unreachable();
+        }finally {
+            new Object();
+            var tmp = (function() {
+                var s = new String();
+                try {
+                    s.length;
+                }finally {
+                    return 1;
+                }
+            })();
+        }
+        unreachable();
+    })();
+    expect(ret, "try");
 })();
 
 tmp = eval("1");
@@ -1488,7 +1526,7 @@ deleteTest = 1;
 delete deleteTest;
 try {
     tmp = deleteTest;
-    ok(false, "deleteTest not throwed exception?");
+    ok(false, "deleteTest did not throw an exception?");
 }catch(ex) {}
 
 (function() {
@@ -1796,6 +1834,8 @@ ok(tmp, "tmp = " + tmp);
     }
     ok(x === undefined, "x = " + x);
 })();
+
+var get, set;
 
 /* NoNewline rule parser tests */
 while(true) {

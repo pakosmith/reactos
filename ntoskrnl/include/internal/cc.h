@@ -188,7 +188,6 @@ typedef struct _ROS_SHARED_CACHE_MAP
 
     /* ROS specific */
     LIST_ENTRY CacheMapVacbListHead;
-    ULONG TimeStamp;
     BOOLEAN PinAccess;
     KSPIN_LOCK CacheMapLock;
 #if DBG
@@ -233,7 +232,6 @@ typedef struct _INTERNAL_BCB
     ERESOURCE Lock;
     PUBLIC_BCB PFCB;
     PROS_VACB Vacb;
-    BOOLEAN Dirty;
     ULONG PinCount;
     CSHORT RefCount; /* (At offset 0x34 on WinNT4) */
     LIST_ENTRY BcbEntry;
@@ -278,7 +276,7 @@ typedef enum _WORK_QUEUE_FUNCTIONS
 {
     ReadAhead = 1,
     WriteBehind = 2,
-    LazyWrite = 3,
+    LazyScan = 3,
     SetDone = 4,
 } WORK_QUEUE_FUNCTIONS, *PWORK_QUEUE_FUNCTIONS;
 
@@ -288,6 +286,7 @@ extern LAZY_WRITER LazyWriter;
 #define NODE_TYPE_PRIVATE_MAP    0x02FE
 #define NODE_TYPE_SHARED_MAP     0x02FF
 
+INIT_FUNCTION
 VOID
 NTAPI
 CcPfInitializePrefetcher(
@@ -324,6 +323,7 @@ CcRosGetVacb(
     PROS_VACB *Vacb
 );
 
+INIT_FUNCTION
 VOID
 NTAPI
 CcInitView(VOID);
@@ -340,6 +340,7 @@ NTSTATUS
 NTAPI
 CcWriteVirtualAddress(PROS_VACB Vacb);
 
+INIT_FUNCTION
 BOOLEAN
 NTAPI
 CcInitializeCacheManager(VOID);

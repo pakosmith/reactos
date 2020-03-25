@@ -72,6 +72,7 @@ BEGIN
         MENUITEM SEPARATOR
         MENUITEM "Vyj&mout", IDM_CUT
         MENUITEM "&Kopírovat", IDM_COPY
+        MENUITEM "Paste", IDM_INSERT
         MENUITEM SEPARATOR
         MENUITEM "Vytvořit zástupc&e", IDM_CREATELINK
         MENUITEM "O&dstranit", IDM_DELETE
@@ -100,7 +101,7 @@ FONT 8, "MS Shell Dlg"
 BEGIN
     DEFPUSHBUTTON "OK", 1, 80, 176, 50, 12, BS_DEFPUSHBUTTON | WS_GROUP | WS_TABSTOP
     PUSHBUTTON "Storno", 2, 134, 176, 50, 12, WS_GROUP | WS_TABSTOP
-    LTEXT "", IDC_BROWSE_FOR_FOLDER_TITLE, 4, 4, 180, 12
+    LTEXT "", IDC_BROWSE_FOR_FOLDER_TITLE, 4, 4, 180, 24
     LTEXT "", IDC_BROWSE_FOR_FOLDER_STATUS, 4, 25, 180, 12
     CONTROL "", IDC_BROWSE_FOR_FOLDER_TREEVIEW, "SysTreeView32", TVS_HASBUTTONS | TVS_HASLINES | TVS_LINESATROOT | WS_BORDER | WS_TABSTOP, 4, 40, 180, 120
 END
@@ -140,11 +141,7 @@ FONT 8, "MS Shell Dlg"
 BEGIN
     ICON "", IDC_ABOUT_ICON, 7, 55, 21, 20
     LTEXT "", IDC_ABOUT_APPNAME, 35, 55, 200, 10
-    LTEXT "Verze ", IDC_STATIC, 35, 65, 28, 10
-    LTEXT KERNEL_VERSION_STR, IDC_STATIC, 63, 65, 27, 10
-    LTEXT " (", IDC_STATIC, 90, 65, 5, 10
-    LTEXT KERNEL_VERSION_BUILD_STR, IDC_STATIC, 95, 65, 58, 10
-    LTEXT ")", IDC_STATIC, 153, 65, 5, 10
+    LTEXT "", IDC_ABOUT_VERSION, 35, 65, 250, 10
     LTEXT "Copyright 1998-", IDC_STATIC, 35, 75, 53, 10
     LTEXT COPYRIGHT_YEAR, IDC_STATIC, 88, 75, 17, 10
     LTEXT " ReactOS Team\0", IDC_STATIC, 105, 75, 53, 10
@@ -173,7 +170,7 @@ CAPTION "Spustit"
 FONT 8, "MS Shell Dlg"
 BEGIN
     ICON "", IDC_RUNDLG_ICON, 7, 11, 18, 20, WS_VISIBLE
-    LTEXT "Zadejte název programu, složky, dokumentu, nebo zdroje v síti Internet a ReactOS jej pro vás otevře.", 12289, 36, 11, 182, 18
+    LTEXT "Zadejte název programu, složky, dokumentu, nebo zdroje v síti Internet a ReactOS jej pro vás otevře.", 12289, 36, 11, 185, 18
     LTEXT "&Otevřít:", 12305, 7, 39, 24, 10
     CONTROL "", IDC_RUNDLG_EDITPATH, "COMBOBOX", WS_TABSTOP | WS_GROUP | WS_VSCROLL | WS_VISIBLE | CBS_AUTOHSCROLL | CBS_DROPDOWN, 36, 37, 184, 100
     DEFPUSHBUTTON "OK", IDOK, 62, 70, 50, 14, WS_TABSTOP
@@ -219,8 +216,8 @@ BEGIN
     CHECKBOX "Spustit s jinými pověřeními", IDC_SHORTEX_RUN_DIFFERENT, 25, 50, 150, 10
     LTEXT "Tato možnost umožní spustit tohoto zástupce jako jiný uživatel nebo při spuštění se současným uživatelem chránit počítač před nepovolenou aktivitou programu.", -1, 50, 60, 175, 40
     CHECKBOX "Spustit v odděleném paměťovém prostoru", IDC_SHORTEX_RUN_SEPARATE, 25, 100, 150, 10, WS_DISABLED
-    PUSHBUTTON "OK", 1, 63, 124, 50, 15, WS_VISIBLE
-    PUSHBUTTON "Storno", 2, 120, 124, 50, 15, WS_VISIBLE
+    PUSHBUTTON "OK", IDOK, 63, 124, 50, 15, WS_VISIBLE
+    PUSHBUTTON "Storno", IDCANCEL, 120, 124, 50, 15, WS_VISIBLE
 END
 
 IDD_FOLDER_PROPERTIES DIALOGEX 0, 0, 240, 205
@@ -265,7 +262,7 @@ BEGIN
     LTEXT "Otevírat v:", 14006, 8, 53, 50, 10
     ICON "", 14025, 58, 52, 11, 10, NOT WS_VISIBLE
     PUSHBUTTON "&Změnit...", 14024, 168, 50, 60, 14, WS_CHILD | WS_VISIBLE | WS_TABSTOP
-    EDITTEXT 14007, 58, 53, 170, 10, ES_LEFT | ES_READONLY | NOT WS_BORDER | ES_AUTOHSCROLL | NOT WS_TABSTOP
+    EDITTEXT 14007, 58, 53, 100, 10, ES_LEFT | ES_READONLY | NOT WS_BORDER | ES_AUTOHSCROLL | NOT WS_TABSTOP
     LTEXT "", -1, 8, 68, 221, 1, SS_ETCHEDHORZ | WS_CHILD | WS_VISIBLE
     LTEXT "Umístění:", 14008, 8, 75, 45, 10
     EDITTEXT 14009, 58, 75, 170, 10, ES_LEFT | ES_READONLY | NOT WS_BORDER | ES_AUTOHSCROLL | NOT WS_TABSTOP
@@ -390,7 +387,7 @@ STYLE DS_SHELLFONT | WS_CHILD | WS_DISABLED | WS_CAPTION
 CAPTION "Vlastnosti Koše"
 FONT 8, "MS Shell Dlg", 0, 0, 0x0
 BEGIN
-    CONTROL "", 14000, "SysListView32", LVS_REPORT | LVS_SHAREIMAGELISTS | WS_BORDER | WS_TABSTOP, 10, 10, 220, 50
+    CONTROL "", 14000, "SysListView32", LVS_REPORT | LVS_SHOWSELALWAYS | LVS_SHAREIMAGELISTS | WS_BORDER | WS_TABSTOP, 10, 10, 220, 50
     GROUPBOX "Nastavení pro vybrané umístění", -1, 10, 72, 220, 70
     RADIOBUTTON "&Zvolená velikost:", 14001, 20, 90, 80, 10, WS_TABSTOP
     EDITTEXT 14002, 106, 87, 50, 14, WS_TABSTOP | ES_NUMBER
@@ -756,6 +753,9 @@ BEGIN
     IDS_FONTS_DESCRIPTION "Přidá, mění a spravuje soubory písem."
     IDS_PRINTERS_DESCRIPTION "Zobrazí instalované tiskárny a faxy a pomůže přidat další."
 
+    /* About shell dialog version string */
+    IDS_ABOUT_VERSION_STRING "Verze %S (%S)"
+
     /* context menus */
     IDS_VIEW_LARGE "&Vedle sebe"
     IDS_VIEW_SMALL "&Ikony"
@@ -774,6 +774,17 @@ BEGIN
     IDS_PASTE "Vložit"
     IDS_EJECT "Eject"
     IDS_DISCONNECT "Disconnect"
+    IDS_OPENFILELOCATION "Open f&ile location"
+    IDS_DESKLINK "Desktop (Create shortcut)"
+    IDS_SENDTO_MENU "Se&nd To"
+
+    IDS_MOVEERRORTITLE "Error Moving File or Folder"
+    IDS_COPYERRORTITLE "Error Copying File or Folder"
+    IDS_MOVEERRORSAMEFOLDER "Cannot move '%s': The destination folder is the same as the source folder."
+    IDS_MOVEERRORSAME "Cannot move '%s': The source and destination file names are the same."
+    IDS_COPYERRORSAME "Cannot copy '%s': The source and destination file names are the same."
+    IDS_MOVEERRORSUBFOLDER "Cannot move '%s': The destination folder is a subfolder of the source folder."
+    IDS_COPYERRORSUBFOLDER "Cannot copy '%s': The destination folder is a subfolder of the source folder."
 
     IDS_CREATEFOLDER_DENIED "Složku '%1' nebylo možné vytvořit"
     IDS_CREATEFOLDER_CAPTION "Složku nebylo možné vytvořit"
@@ -802,6 +813,11 @@ BEGIN
     IDS_RESTART_PROMPT "Opravdu chcete restartovat systém?"
     IDS_SHUTDOWN_TITLE "Vypnout"
     IDS_SHUTDOWN_PROMPT "Opravdu chcete vypnout počítač?"
+    
+    /* Format Dialog Strings */
+    IDS_FORMAT_TITLE "Format Local Disk"
+    IDS_FORMAT_WARNING "WARNING: Formatting will erase ALL data on this disk.\nTo format the disk, click OK. To quit, click CANCEL."
+    IDS_FORMAT_COMPLETE "Format Complete."
 
     /* Run File dialog */
     IDS_RUNDLG_ERROR "Nelze zobrazit dialog Spustit soubor (interní chyba)"
@@ -809,7 +825,7 @@ BEGIN
     IDS_RUNDLG_BROWSE_CAPTION "Procházet"
     IDS_RUNDLG_BROWSE_FILTER "Spustitelné soubory (*.exe)\0*.exe\0Všechnysoubory (*.*)\0*.*\0"
 
-    /* shell folder path default values */
+    /* Shell folder path default values. See also: dll/win32/userenv/lang */
     IDS_PROGRAMS "Nabídka Start\\Programy"
     IDS_PERSONAL "Dokumenty"
     IDS_FAVORITES "Oblíbené"
@@ -872,6 +888,7 @@ BEGIN
     IDS_CANTEJECTMEDIA "Unable to eject media (Error Code: %lu)."
     IDS_CANTSHOWPROPERTIES "Unable to show properties (Error Code: %lu)."
     IDS_CANTDISCONNECT "Unable to disconnect (Error Code: %lu)."
+    IDS_NONE "(None)"
 
     /* Friendly File Type Names */
     IDS_DIRECTORY "Složka"
@@ -908,6 +925,7 @@ BEGIN
     IDS_EDIT_VERB "Upravit"
     IDS_FIND_VERB "Najít"
     IDS_PRINT_VERB "Tisknout"
+    IDS_CMD_VERB "Command Prompt here"
 
     IDS_FILE_FOLDER "%u souborů, %u složek"
     IDS_PRINTERS "Tiskárny"
@@ -935,6 +953,26 @@ BEGIN
     IDS_MENU_EMPTY "(Prázdné)"
     IDS_OBJECTS "Položek: %d"
     IDS_OBJECTS_SELECTED "Položek vybráno: %d"
+
+    IDS_ADVANCED_FOLDER "Files and Folders"
+    IDS_ADVANCED_NET_CRAWLER "Automatically search for network folders and printers"
+    IDS_ADVANCED_FOLDER_SIZE_TIP "Display file size information in folder tips"
+    IDS_ADVANCED_FRIENDLY_TREE "Display simple folder view in Explorer's Folders list"
+    IDS_ADVANCED_WEB_VIEW_BARRICADE "Display the contents of system folders"
+    IDS_ADVANCED_SHOW_FULL_PATH_ADDRESS "Display the full path in address bar"
+    IDS_ADVANCED_SHOW_FULL_PATH "Display the full path in the title bar"
+    IDS_ADVANCED_DISABLE_THUMB_CACHE "Do not cache thumbnails"
+    IDS_ADVANCED_HIDDEN "Hidden files and folders"
+    IDS_ADVANCED_DONT_SHOW_HIDDEN "Do not show hidden files and folders"
+    IDS_ADVANCED_SHOW_HIDDEN "Show hidden files and folders"
+    IDS_ADVANCED_HIDE_FILE_EXT "Hide extensions for known file types"
+    IDS_ADVANCED_SUPER_HIDDEN "Hide protected operating system files (Recommended)"
+    IDS_ADVANCED_DESKTOP_PROCESS "Launch folder windows in a separate process"
+    IDS_ADVANCED_CLASSIC_VIEW_STATE "Remember each folder's view settings"
+    IDS_ADVANCED_PERSIST_BROWSERS "Restore previous folder windows at logon"
+    IDS_ADVANCED_CONTROL_PANEL_IN_MY_COMPUTER "Show Control Panel in My Computer"
+    IDS_ADVANCED_SHOW_COMP_COLOR "Show encrypted or compressed NTFS files in color"
+    IDS_ADVANCED_SHOW_INFO_TIP "Show pop-up description for folder and desktop items"
 
     IDS_NEWEXT_ADVANCED_LEFT "<< Ad&vanced"
     IDS_NEWEXT_ADVANCED_RIGHT "Ad&vanced >>"

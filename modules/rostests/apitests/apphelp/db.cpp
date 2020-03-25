@@ -4,7 +4,7 @@
  * PURPOSE:     Tests for shim-database api's
  * COPYRIGHT:   Copyright 2012 Detlef Riekenberg
  *              Copyright 2013 Mislav Blažević
- *              Copyright 2015-2018 Mark Jansen (mark.jansen@reactos.org)
+ *              Copyright 2015-2019 Mark Jansen (mark.jansen@reactos.org)
  */
 
 #include <ntstatus.h>
@@ -120,6 +120,16 @@
 #define TAG_DATABASE_ID (0x7 | TAG_TYPE_BINARY)
 
 
+typedef struct _DB_INFORMATION
+{
+    DWORD dwSomething;
+    DWORD dwMajor;
+    DWORD dwMinor;
+    LPCWSTR Description;
+    GUID Id;
+    /* Win10+ has an extra field here */
+} DB_INFORMATION, *PDB_INFORMATION;
+
 
 static HMODULE hdll;
 static LPCWSTR (WINAPI *pSdbTagToString)(TAG);
@@ -163,6 +173,8 @@ static LONGLONG (WINAPI* pSdbMakeIndexKeyFromString)(LPCWSTR);
 static DWORD (WINAPI* pSdbQueryData)(HSDB hsdb, TAGREF trWhich, LPCWSTR lpszDataName, LPDWORD lpdwDataType, LPVOID lpBuffer, LPDWORD lpcbBufferSize);
 static DWORD (WINAPI* pSdbQueryDataEx)(HSDB hsdb, TAGREF trWhich, LPCWSTR lpszDataName, LPDWORD lpdwDataType, LPVOID lpBuffer, LPDWORD lpcbBufferSize, TAGREF *ptrData);
 static DWORD (WINAPI* pSdbQueryDataExTagID)(PDB pdb, TAGID tiExe, LPCWSTR lpszDataName, LPDWORD lpdwDataType, LPVOID lpBuffer, LPDWORD lpcbBufferSize, TAGID *ptiData);
+static BOOL (WINAPI* pSdbGetDatabaseInformation)(PDB pdb, PDB_INFORMATION information);
+static VOID (WINAPI* pSdbFreeDatabaseInformation)(PDB_INFORMATION information);
 
 DEFINE_GUID(GUID_DATABASE_TEST, 0xe39b0eb0, 0x55db, 0x450b, 0x9b, 0xd4, 0xd2, 0x0c, 0x94, 0x84, 0x26, 0x0f);
 DEFINE_GUID(GUID_MAIN_DATABASE, 0x11111111, 0x1111, 0x1111, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11);
@@ -173,6 +185,55 @@ static void Write(HANDLE file, LPCVOID buffer, DWORD size)
     DWORD dwWritten = 0;
     WriteFile(file, buffer, size, &dwWritten, NULL);
 }
+
+static void test_GetDatabaseInformationEmpty(PDB pdb)
+{
+    PDB_INFORMATION pInfo;
+    BOOL fResult;
+
+    if (!pSdbGetDatabaseInformation || !pSdbFreeDatabaseInformation)
+    {
+        skip("GetDatabaseInformation or SdbFreeDatabaseInformation not found\n");
+        return;
+    }
+
+    pInfo = (PDB_INFORMATION)malloc(sizeof(*pInfo) * 4);
+    memset(pInfo, 0xDE, sizeof(*pInfo) * 2);
+
+    fResult = pSdbGetDatabaseInformation(pdb, pInfo);
+    ok(fResult, "SdbGetDatabaseInformation failed\n");
+    if (fResult)
+    {
+        ok_int(pInfo->dwSomething, 0);
+        ok(IsEqualGUID(GUID_NULL, pInfo->Id), "expected guid to be empty(%s)\n", wine_dbgstr_guid(&pInfo->Id));
+        ok(pInfo->Description == NULL, "Expected pInfo->Description to be NULL, was %s\n", wine_dbgstr_w(pInfo->Description));
+
+        /* Struct is slightly bigger on some Win10, and the DB version nr is different on all */
+        if (g_WinVersion >= WINVER_WIN10)
+        {
+            ok(pInfo->dwMajor == 3, "Expected pInfo->dwMajor to be 3, was: %d\n", pInfo->dwMajor);
+            ok(pInfo->dwMinor == 0, "Expected pInfo->dwMinor to be 0, was: %d\n", pInfo->dwMinor);
+
+            ok(pInfo[1].dwSomething == 0 || pInfo[1].dwSomething == 0xdededede, "Something amiss: 0x%x\n", pInfo[1].dwSomething);
+            ok(pInfo[1].dwMajor == 0xdededede, "Cookie2 corrupt: 0x%x\n", pInfo[1].dwMajor);
+        }
+        else
+        {
+            ok(pInfo->dwMajor == 2, "Expected pInfo->dwMajor to be 2, was: %d\n", pInfo->dwMajor);
+            if (g_WinVersion >= _WIN32_WINNT_VISTA)
+                ok(pInfo->dwMinor == 1, "Expected pInfo->dwMinor to be 1, was: %d\n", pInfo->dwMinor);
+            else
+                ok(pInfo->dwMinor >= 190915 && pInfo->dwMinor <= 191300,
+                   "Expected pInfo->dwMinor to be between 190915 and 191300, was: %d\n", pInfo->dwMinor);
+
+            ok(pInfo[1].dwSomething == 0xdededede, "Cookie1 corrupt: 0x%x\n", pInfo[1].dwSomething);
+            ok(pInfo[1].dwMajor == 0xdededede, "Cookie2 corrupt: 0x%x\n", pInfo[1].dwMajor);
+        }
+
+    }
+    free(pInfo);
+}
+
 
 static void test_Sdb(void)
 {
@@ -288,6 +349,8 @@ static void test_Sdb(void)
         tagid = pSdbGetNextChild(pdb, ptagid, tagid);
         word = pSdbReadWORDTag(pdb, tagid, 0);
         ok(word == 0xACE, "unexpected value 0x%x, expected 0x%x\n", word, 0xACE);
+
+        test_GetDatabaseInformationEmpty(pdb);
 
         pSdbCloseDatabase(pdb);
     }
@@ -966,6 +1029,63 @@ static void check_db_apphelp(PDB pdb, TAGID root)
     ok(num == 2, "Expected to find 2 layer tags, found: %d\n", num);
 }
 
+static void test_GetDatabaseInformation(PDB pdb)
+{
+    PDB_INFORMATION pInfo;
+    BOOL fResult;
+
+    if (!pSdbGetDatabaseInformation || !pSdbFreeDatabaseInformation)
+    {
+        skip("GetDatabaseInformation or SdbFreeDatabaseInformation not found\n");
+        return;
+    }
+
+    _SEH2_TRY
+    {
+        pSdbFreeDatabaseInformation(NULL);
+    }
+    _SEH2_EXCEPT(EXCEPTION_EXECUTE_HANDLER)
+    {
+        ok(0, "SdbFreeDatabaseInformation did not handle a NULL pointer very gracefully.\n");
+    }
+    _SEH2_END;
+
+
+    pInfo = (PDB_INFORMATION)malloc(sizeof(*pInfo) * 4);
+    memset(pInfo, 0xDE, sizeof(*pInfo) * 2);
+
+    fResult = pSdbGetDatabaseInformation(pdb, pInfo);
+    ok(fResult, "SdbGetDatabaseInformation failed\n");
+    if (fResult)
+    {
+        ok_int(pInfo->dwSomething, 1);
+        ok(IsEqualGUID(GUID_DATABASE_TEST, pInfo->Id), "expected guids to be equal(%s:%s)\n",
+           wine_dbgstr_guid(&GUID_DATABASE_TEST), wine_dbgstr_guid(&pInfo->Id));
+        ok(wcscmp(pInfo->Description, L"apphelp_test1") == 0,
+           "Expected pInfo->Description to be 'apphelp_test1', was %s\n", wine_dbgstr_w(pInfo->Description));
+
+        /* Struct is slightly bigger on some Win10, and the DB version nr is different on all */
+        if (g_WinVersion >= WINVER_WIN10)
+        {
+            ok(pInfo->dwMajor == 3, "Expected pInfo->dwMajor to be 3, was: %d\n", pInfo->dwMajor);
+            ok(pInfo->dwMinor == 0, "Expected pInfo->dwMinor to be 0, was: %d\n", pInfo->dwMinor);
+
+            ok(pInfo[1].dwSomething == 4 || pInfo[1].dwSomething == 0xdededede, "Something amiss: 0x%x\n", pInfo[1].dwSomething);
+            ok(pInfo[1].dwMajor == 0xdededede, "Cookie2 corrupt: 0x%x\n", pInfo[1].dwMajor);
+        }
+        else
+        {
+            ok(pInfo->dwMajor == 2, "Expected pInfo->dwMajor to be 2, was: %d\n", pInfo->dwMajor);
+            ok(pInfo->dwMinor == 1, "Expected pInfo->dwMinor to be 1, was: %d\n", pInfo->dwMinor);
+
+            ok(pInfo[1].dwSomething == 0xdededede, "Cookie1 corrupt: 0x%x\n", pInfo[1].dwSomething);
+            ok(pInfo[1].dwMajor == 0xdededede, "Cookie2 corrupt: 0x%x\n", pInfo[1].dwMajor);
+        }
+        
+    }
+    free(pInfo);
+}
+
 static void test_CheckDatabaseManually(void)
 {
     static const WCHAR path[] = {'t','e','s','t','_','d','b','.','s','d','b',0};
@@ -1040,6 +1160,7 @@ static void test_CheckDatabaseManually(void)
         check_db_exes(pdb, root);
         check_db_apphelp(pdb, root);
     }
+    test_GetDatabaseInformation(pdb);
 
     pSdbCloseDatabase(pdb);
     DeleteFileA("test_db.sdb");
@@ -1400,12 +1521,25 @@ static void test_match_ex(const WCHAR* workdir, HSDB hsdb)
         ret = pSdbGetMatchingExe(hsdb, exename, NULL, NULL, 0, (SDBQUERYRESULT_VISTA*)&query);
         DWORD exe_count = Succeed ? 1 : 0;
 
-        if (Succeed)
-            ok(ret, "SdbGetMatchingExe should not fail for %s.\n", wine_dbgstr_w(TestName));
+        if (Succeed && !ret && g_WinVersion == _WIN32_WINNT_WS03)
+        {
+            skip("As long as we do not have indexes, we will hit a bug in W2k3\n");
+#if 0
+[Info][SdbGetIndex         ] index 0x7007(0x600b) was not found in the index table
+[Info][SdbGetIndex         ] index 0x7007(0x6001) was not found in the index table
+[Info][SdbpSearchDB        ] Searching database with no index.
+[Err ][SdbpSearchDB        ] No DATABASE tag found.
+#endif
+        }
         else
-            ok(!ret, "SdbGetMatchingExe should not succeed for %s.\n", wine_dbgstr_w(TestName));
+        {
+            if (Succeed)
+                ok(ret, "SdbGetMatchingExe should not fail for %s.\n", wine_dbgstr_w(TestName));
+            else
+                ok(!ret, "SdbGetMatchingExe should not succeed for %s.\n", wine_dbgstr_w(TestName));
 
-        ok(query.dwExeCount == exe_count, "Expected dwExeCount to be %d, was %d for %s\n", exe_count, query.dwExeCount, wine_dbgstr_w(TestName));
+            ok(query.dwExeCount == exe_count, "Expected dwExeCount to be %d, was %d for %s\n", exe_count, query.dwExeCount, wine_dbgstr_w(TestName));
+        }
         DeleteFileW(exename);
     }
 }
@@ -1655,12 +1789,14 @@ static void test_DataTags(HSDB hsdb)
     ok_hex(dwBufferSize, sizeof(DWORD));
     ok_hex(*(DWORD*)Buffer, 3333);
 
-    /* This succeeds on 2k3.. */
-    memset(Buffer, 0xaa, sizeof(Buffer));
-    dwBufferSize = sizeof(Buffer);
-    dwRet = pSdbQueryDataExTagID(pdb, layer, L"TESTDATA1", NULL, Buffer, NULL, NULL);
-    ok_hex(dwRet, ERROR_INSUFFICIENT_BUFFER);
-    ok_hex(*(DWORD*)Buffer, (int)0xaaaaaaaa);
+    if (g_WinVersion > _WIN32_WINNT_WS03)
+    {
+        memset(Buffer, 0xaa, sizeof(Buffer));
+        dwBufferSize = sizeof(Buffer);
+        dwRet = pSdbQueryDataExTagID(pdb, layer, L"TESTDATA1", NULL, Buffer, NULL, NULL);
+        ok_hex(dwRet, ERROR_INSUFFICIENT_BUFFER);
+        ok_hex(*(DWORD*)Buffer, (int)0xaaaaaaaa);
+    }
 
     memset(Buffer, 0xaa, sizeof(Buffer));
     dwBufferSize = 1;
@@ -1760,7 +1896,10 @@ static void test_DataTags(HSDB hsdb)
     ok_hex(dwDataType, 0x12345);
     ok_hex(dwBufferSize, sizeof(Buffer));
     ok_hex(*(DWORD*)Buffer, (int)0xaaaaaaaa);
-    ok(trData == 0x111111, "Expected 0x111111, got 0x%x\n", trData);
+    if (g_WinVersion == _WIN32_WINNT_WS03)
+        ok(trData == 0, "Expected 0, got 0x%x\n", trData);
+    else
+        ok(trData == 0x111111, "Expected 0x111111, got 0x%x\n", trData);
 
     /* And SdbQueryData as well */
     memset(Buffer, 0xaa, sizeof(Buffer));
@@ -1945,9 +2084,9 @@ static int validate_SDBQUERYRESULT_size()
 
 START_TEST(db)
 {
-    //SetEnvironmentVariable("SHIM_DEBUG_LEVEL", "4");
-    //SetEnvironmentVariable("SHIMENG_DEBUG_LEVEL", "4");
-    //SetEnvironmentVariable("DEBUGCHANNEL", "+apphelp");
+    //SetEnvironmentVariableA("SHIM_DEBUG_LEVEL", "4");
+    //SetEnvironmentVariableA("SHIMENG_DEBUG_LEVEL", "4");
+    //SetEnvironmentVariableA("DEBUGCHANNEL", "+apphelp");
 
     silence_debug_output();
     hdll = LoadLibraryA("apphelp.dll");
@@ -1998,6 +2137,8 @@ START_TEST(db)
     *(void**)&pSdbQueryDataEx = (void *)GetProcAddress(hdll, "SdbQueryDataEx");
     *(void**)&pSdbQueryDataExTagID = (void *)GetProcAddress(hdll, "SdbQueryDataExTagID");
     *(void**)&pSdbGetLayerTagRef = (void *)GetProcAddress(hdll, "SdbGetLayerTagRef");
+    *(void**)&pSdbGetDatabaseInformation = (void *)GetProcAddress(hdll, "SdbGetDatabaseInformation");
+    *(void**)&pSdbFreeDatabaseInformation = (void *)GetProcAddress(hdll, "SdbFreeDatabaseInformation");
 
     test_Sdb();
     test_write_ex();

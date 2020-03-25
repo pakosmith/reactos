@@ -17,7 +17,7 @@ FONT 9, "宋体"
 BEGIN
     AUTORADIOBUTTON "安装 ReactOS", IDC_INSTALL, 7, 7, 277, 10, WS_GROUP | WS_TABSTOP
     LTEXT "安装 ReactOS 的新副本。此选项将不会保存你的文件、设置和程序。你可以对磁盘和分区进行更改。", IDC_INSTALLTEXT, 18, 18, 269, 25, NOT WS_GROUP
-    AUTORADIOBUTTON "修复或更新已安装的 ReactOS", IDC_UPDATE, 7, 50, 277, 10
+    AUTORADIOBUTTON "修复或更新已安装的 ReactOS 副本", IDC_UPDATE, 7, 50, 277, 10
     LTEXT "更新或修复 ReactOS 安装的副本。此选项会保存您的文件、设置和程序。如果 ReactOS 已经安装，此选项方可使用。", IDC_UPDATETEXT, 18, 61, 269, 30, NOT WS_GROUP
     LTEXT "点击下一步安装设备。", IDC_STATIC, 7, 128, 297, 8
 END
@@ -112,7 +112,7 @@ BEGIN
     EDITTEXT IDC_DESTDRIVE, 95, 76, 210, 13, ES_READONLY | ES_AUTOHSCROLL | WS_VISIBLE | NOT WS_BORDER | NOT WS_TABSTOP
     LTEXT "目标目录:", IDC_STATIC, 18, 89, 74, 11
     EDITTEXT IDC_PATH, 95, 88, 210, 13, ES_READONLY | ES_AUTOHSCROLL | WS_VISIBLE | NOT WS_BORDER | NOT WS_TABSTOP
-    AUTOCHECKBOX "我确认我的操作是无误的。我同样了解 ReactOS \n 是一款 alpha 级软件，可能会损害我的计算机或破坏我的数据。",
+    AUTOCHECKBOX "我确认我的操作是无误的。我同样了解 ReactOS\n 是一款 alpha 级软件，可能会损害我的计算机或破坏我的数据。",
         IDC_CONFIRM_INSTALL, 7, 104, 303, 18, BS_MULTILINE
     LTEXT "请确认所有安装设置正确，\n然后点击安装开始安装。", IDC_STATIC, 7, 124, 303, 18
 END

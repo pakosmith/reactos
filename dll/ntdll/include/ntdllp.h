@@ -29,9 +29,20 @@ typedef struct _LDRP_TLS_DATA
     IMAGE_TLS_DIRECTORY TlsDirectory;
 } LDRP_TLS_DATA, *PLDRP_TLS_DATA;
 
+typedef
+NTSTATUS
+(NTAPI* PLDR_APP_COMPAT_DLL_REDIRECTION_CALLBACK_FUNCTION)(
+    _In_ ULONG Flags,
+    _In_ PCWSTR DllName,
+    _In_ PCWSTR DllPath OPTIONAL,
+    _Inout_opt_ PULONG DllCharacteristics,
+    _In_ PVOID CallbackData,
+    _Outptr_ PWSTR* EffectiveDllPath);
+
 /* Global data */
 extern RTL_CRITICAL_SECTION LdrpLoaderLock;
 extern BOOLEAN LdrpInLdrInit;
+extern PVOID LdrpHeap;
 extern LIST_ENTRY LdrpHashTable[LDR_HASH_TABLE_ENTRIES];
 extern BOOLEAN ShowSnaps;
 extern UNICODE_STRING LdrpDefaultPath;
@@ -201,5 +212,13 @@ LdrpLoadImportModule(IN PWSTR DllPath OPTIONAL,
 VOID
 NTAPI
 LdrpFinalizeAndDeallocateDataTableEntry(IN PLDR_DATA_TABLE_ENTRY Entry);
+
+
+/* path.c */
+BOOLEAN
+NTAPI
+RtlDoesFileExists_UStr(
+    IN PUNICODE_STRING FileName
+);
 
 /* EOF */

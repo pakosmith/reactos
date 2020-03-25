@@ -158,6 +158,7 @@ BEGIN
     IDS_AINFO_URLSITE "\nHjemmeside: "
     IDS_AINFO_LICENSE "\nLisens: "
     IDS_AINFO_URLDOWNLOAD "\nNedlasting: "
+    IDS_AINFO_LANGUAGES "\nLanguages: "
 END
 
 STRINGTABLE
@@ -177,6 +178,7 @@ BEGIN
     IDS_CAT_SCIENCE "Vitenskap"
     IDS_CAT_TOOLS "Verktøy"
     IDS_CAT_VIDEO "Filmer"
+    IDS_CAT_THEMES "Themes"
 END
 
 STRINGTABLE

@@ -19,21 +19,16 @@
 #define _64K (64 * _1KB)
 
 /* Area mapped by a PDE */
-#define PDE_MAPPED_VA  (PTE_COUNT * PAGE_SIZE)
+#define PDE_MAPPED_VA  (PTE_PER_PAGE * PAGE_SIZE)
 
 /* Size of a page table */
-#define PT_SIZE  (PTE_COUNT * sizeof(MMPTE))
+#define PT_SIZE  (PTE_PER_PAGE * sizeof(MMPTE))
 
 /* Size of a page directory */
-#define PD_SIZE  (PDE_COUNT * sizeof(MMPDE))
-
-/* Stop using these! */
-#define PD_COUNT  PPE_PER_PAGE
-#define PDE_COUNT PDE_PER_PAGE
-#define PTE_COUNT PTE_PER_PAGE
+#define PD_SIZE  (PDE_PER_PAGE * sizeof(MMPDE))
 
 /* Size of all page directories for a process */
-#define SYSTEM_PD_SIZE (PD_COUNT * PD_SIZE)
+#define SYSTEM_PD_SIZE (PPE_PER_PAGE * PD_SIZE)
 #ifdef _M_IX86
 C_ASSERT(SYSTEM_PD_SIZE == PAGE_SIZE);
 #endif
@@ -83,7 +78,7 @@ C_ASSERT(SYSTEM_PD_SIZE == PAGE_SIZE);
 // while on certain architectures such as ARM, it is enabling the cache which
 // requires a flag.
 //
-#if defined(_M_IX86) || defined(_M_AMD64)
+#if defined(_M_IX86)
 //
 // Access Flags
 //
@@ -109,6 +104,34 @@ C_ASSERT(SYSTEM_PD_SIZE == PAGE_SIZE);
 #define PTE_ENABLE_CACHE        0
 #define PTE_DISABLE_CACHE       0x10
 #define PTE_WRITECOMBINED_CACHE 0x10
+#define PTE_PROTECT_MASK        0x612
+#elif defined(_M_AMD64)
+//
+// Access Flags
+//
+#define PTE_READONLY            0x8000000000000000ULL
+#define PTE_EXECUTE             0x0000000000000000ULL
+#define PTE_EXECUTE_READ        PTE_EXECUTE /* EXECUTE implies READ on x64 */
+#define PTE_READWRITE           0x8000000000000002ULL
+#define PTE_WRITECOPY           0x8000000000000200ULL
+#define PTE_EXECUTE_READWRITE   0x0000000000000002ULL
+#define PTE_EXECUTE_WRITECOPY   0x0000000000000200ULL
+#define PTE_PROTOTYPE           0x0000000000000400ULL
+
+//
+// State Flags
+//
+#define PTE_VALID               0x0000000000000001ULL
+#define PTE_ACCESSED            0x0000000000000020ULL
+#define PTE_DIRTY               0x0000000000000040ULL
+
+//
+// Cache flags
+//
+#define PTE_ENABLE_CACHE        0x0000000000000000ULL
+#define PTE_DISABLE_CACHE       0x0000000000000010ULL
+#define PTE_WRITECOMBINED_CACHE 0x0000000000000010ULL
+#define PTE_PROTECT_MASK        0x8000000000000612ULL
 #elif defined(_M_ARM)
 #define PTE_READONLY            0x200
 #define PTE_EXECUTE             0 // Not worrying about NX yet
@@ -118,15 +141,22 @@ C_ASSERT(SYSTEM_PD_SIZE == PAGE_SIZE);
 #define PTE_EXECUTE_READWRITE   0 // Not worrying about NX yet
 #define PTE_EXECUTE_WRITECOPY   0 // Not worrying about NX yet
 #define PTE_PROTOTYPE           0x400 // Using the Shared bit
+
 //
 // Cache flags
 //
 #define PTE_ENABLE_CACHE        0
 #define PTE_DISABLE_CACHE       0x10
 #define PTE_WRITECOMBINED_CACHE 0x10
+#define PTE_PROTECT_MASK        0x610
 #else
 #error Define these please!
 #endif
+
+//
+// Mask for image section page protection
+//
+#define IMAGE_SCN_PROTECTION_MASK (IMAGE_SCN_MEM_WRITE | IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_EXECUTE)
 
 extern const ULONG_PTR MmProtectToPteMask[32];
 extern const ULONG MmProtectToValue[32];
@@ -609,7 +639,7 @@ extern PVOID MiSessionImageStart;
 extern PVOID MiSessionImageEnd;
 extern PMMPTE MiHighestUserPte;
 extern PMMPDE MiHighestUserPde;
-extern PFN_NUMBER MmSystemPageDirectory[PD_COUNT];
+extern PFN_NUMBER MmSystemPageDirectory[PPE_PER_PAGE];
 extern PMMPTE MmSharedUserDataPte;
 extern LIST_ENTRY MmProcessList;
 extern BOOLEAN MmZeroingPageThreadActive;
@@ -1667,6 +1697,7 @@ MiQueryPageTableReferences(IN PVOID Address)
     return *RefCount;
 }
 
+INIT_FUNCTION
 BOOLEAN
 NTAPI
 MmArmInitSystem(
@@ -1674,34 +1705,40 @@ MmArmInitSystem(
     IN PLOADER_PARAMETER_BLOCK LoaderBlock
 );
 
+INIT_FUNCTION
 VOID
 NTAPI
 MiInitializeSessionSpaceLayout(VOID);
 
+INIT_FUNCTION
 NTSTATUS
 NTAPI
 MiInitMachineDependent(
     IN PLOADER_PARAMETER_BLOCK LoaderBlock
 );
 
+INIT_FUNCTION
 VOID
 NTAPI
 MiComputeColorInformation(
     VOID
 );
 
+INIT_FUNCTION
 VOID
 NTAPI
 MiMapPfnDatabase(
     IN PLOADER_PARAMETER_BLOCK LoaderBlock
 );
 
+INIT_FUNCTION
 VOID
 NTAPI
 MiInitializeColorTables(
     VOID
 );
 
+INIT_FUNCTION
 VOID
 NTAPI
 MiInitializePfnDatabase(
@@ -1720,18 +1757,21 @@ MiInitializeSessionIds(
     VOID
 );
 
+INIT_FUNCTION
 BOOLEAN
 NTAPI
 MiInitializeMemoryEvents(
     VOID
 );
 
+INIT_FUNCTION
 PFN_NUMBER
 NTAPI
 MxGetNextPage(
     IN PFN_NUMBER PageCount
 );
 
+INIT_FUNCTION
 PPHYSICAL_MEMORY_DESCRIPTOR
 NTAPI
 MmInitializeMemoryLimits(
@@ -1778,24 +1818,28 @@ MiCheckPdeForPagedPool(
     IN PVOID Address
 );
 
+INIT_FUNCTION
 VOID
 NTAPI
 MiInitializeNonPagedPool(
     VOID
 );
 
+INIT_FUNCTION
 VOID
 NTAPI
 MiInitializeNonPagedPoolThresholds(
     VOID
 );
 
+INIT_FUNCTION
 VOID
 NTAPI
 MiInitializePoolEvents(
     VOID
 );
 
+INIT_FUNCTION
 VOID                      //
 NTAPI                     //
 InitializePool(           //
@@ -1804,9 +1848,9 @@ InitializePool(           //
 );                        //
 
 // FIXFIX: THIS ONE TOO
+INIT_FUNCTION
 VOID
 NTAPI
-INIT_FUNCTION
 ExInitializePoolDescriptor(
     IN PPOOL_DESCRIPTOR PoolDescriptor,
     IN POOL_TYPE PoolType,
@@ -1821,6 +1865,7 @@ MiInitializeSessionPool(
     VOID
 );
 
+INIT_FUNCTION
 VOID
 NTAPI
 MiInitializeSystemPtes(
@@ -1982,18 +2027,21 @@ MiLookupDataTableEntry(
     IN PVOID Address
 );
 
+INIT_FUNCTION
 VOID
 NTAPI
 MiInitializeDriverLargePageList(
     VOID
 );
 
+INIT_FUNCTION
 VOID
 NTAPI
 MiInitializeLargePageSupport(
     VOID
 );
 
+INIT_FUNCTION
 VOID
 NTAPI
 MiSyncCachedRanges(
@@ -2244,6 +2292,11 @@ MiMakePdeExistAndMakeValid(
     IN PEPROCESS TargetProcess,
     IN KIRQL OldIrql
 );
+
+VOID
+NTAPI
+MiWriteProtectSystemImage(
+    _In_ PVOID ImageBase);
 
 //
 // MiRemoveZeroPage will use inline code to zero out the page manually if only

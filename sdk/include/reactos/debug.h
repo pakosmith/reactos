@@ -15,12 +15,7 @@
 #pragma once
 
 #ifndef __RELFILE__
-#   ifdef __REACTOS__
-#       include <reactos/builddir.h>
-#       define __RELFILE__ &__FILE__[sizeof(REACTOS_SOURCE_DIR)]
-#   else
-#       define __RELFILE__ __FILE__
-#   endif
+#define __RELFILE__ __FILE__
 #endif
 
 /* Define DbgPrint/DbgPrintEx/RtlAssert unless the NDK is used */
@@ -71,7 +66,7 @@ RtlAssert(
 
 #ifndef assert
 #if DBG && !defined(NASSERT)
-#define assert(x) if (!(x)) { RtlAssert((PVOID)#x, (PVOID)__RELFILE__, __LINE__, ""); }
+#define assert(x) if (!(x)) { RtlAssert((PVOID)#x, (PVOID)__RELFILE__, __LINE__, (PCHAR)""); }
 #else
 #define assert(x) ((VOID) 0)
 #endif
@@ -79,7 +74,7 @@ RtlAssert(
 
 #ifndef ASSERT
 #if DBG && !defined(NASSERT)
-#define ASSERT(x) if (!(x)) { RtlAssert((PVOID)#x, (PVOID)__RELFILE__, __LINE__, ""); }
+#define ASSERT(x) if (!(x)) { RtlAssert((PVOID)#x, (PVOID)__RELFILE__, __LINE__, (PCHAR)""); }
 #else
 #define ASSERT(x) ((VOID) 0)
 #endif

@@ -76,7 +76,7 @@ list(APPEND SOURCE
     src/write.c
     inc/rfsd.h)
 
-add_library(reiserfs SHARED ${SOURCE} src/rfsd.rc)
+add_library(reiserfs MODULE ${SOURCE} src/rfsd.rc)
 
 if(USE_CLANG_CL OR (NOT MSVC))
     add_target_compile_flags(reiserfs "-Wno-missing-braces -Wno-pointer-sign")
@@ -86,12 +86,13 @@ if(USE_CLANG_CL OR (NOT MSVC))
     endif()
 else()
     #disable warnings: "unreferenced local variable", "initialized, but not used variable", "benign include"
+    replace_compile_flags("/we4101" " ")
     replace_compile_flags("/we4189" " ")
     add_target_compile_flags(reiserfs "/wd4189 /wd4142 /wd4101")
 endif()
 
 target_link_libraries(reiserfs memcmp ${PSEH_LIB})
-add_definitions(-D__KERNEL__)
+add_definitions(-D__KERNEL__ -D_CRT_NO_POSIX_ERROR_CODES)
 set_module_type(reiserfs kernelmodedriver)
 add_importlibs(reiserfs ntoskrnl hal)
 add_pch(reiserfs inc/rfsd.h SOURCE)

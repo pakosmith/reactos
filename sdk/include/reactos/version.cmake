@@ -2,8 +2,8 @@ string(TIMESTAMP KERNEL_VERSION_BUILD %Y%m%d UTC)
 
 set(KERNEL_VERSION_MAJOR "0")
 set(KERNEL_VERSION_MINOR "4")
-set(KERNEL_VERSION_PATCH_LEVEL "11")
-set(COPYRIGHT_YEAR "2018")
+set(KERNEL_VERSION_PATCH_LEVEL "14")
+set(COPYRIGHT_YEAR "2020")
 
 # KERNEL_VERSION_BUILD_TYPE is "dev" for Git builds
 # or "RC1", "RC2", "" for releases.
@@ -53,4 +53,3 @@ endif()
 
 configure_file(sdk/include/reactos/version.h.cmake ${REACTOS_BINARY_DIR}/sdk/include/reactos/version.h)
 configure_file(sdk/include/reactos/buildno.h.cmake ${REACTOS_BINARY_DIR}/sdk/include/reactos/buildno.h)
-configure_file(sdk/include/reactos/builddir.h.cmake ${REACTOS_BINARY_DIR}/sdk/include/reactos/builddir.h)

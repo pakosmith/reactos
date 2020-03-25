@@ -577,6 +577,58 @@ static void test_page_size(void)
     hWndTrackbar = create_trackbar(defaultstyle, hWndParent);
     ok(hWndTrackbar != NULL, "Expected non NULL value\n");
 
+    r = SendMessageA(hWndTrackbar, TBM_GETPAGESIZE, 0, 0);
+    ok(r == 20, "Unexpected page size %d.\n", r);
+
+    SendMessageA(hWndTrackbar, TBM_SETRANGE, 0, MAKELPARAM(0, 65));
+
+    r = SendMessageA(hWndTrackbar, TBM_GETPAGESIZE, 0, 0);
+    ok(r == 13, "Unexpected page size %d.\n", r);
+
+    SendMessageA(hWndTrackbar, TBM_SETRANGEMIN, 0, 10);
+
+    r = SendMessageA(hWndTrackbar, TBM_GETPAGESIZE, 0, 0);
+    ok(r == 11, "Unexpected page size %d.\n", r);
+
+    SendMessageA(hWndTrackbar, TBM_SETRANGEMAX, 0, 50);
+
+    r = SendMessageA(hWndTrackbar, TBM_GETPAGESIZE, 0, 0);
+    ok(r == 8, "Unexpected page size %d.\n", r);
+
+    r = SendMessageA(hWndTrackbar, TBM_SETPAGESIZE, 0, 10);
+    ok(r == 8, "Unexpected page size %d.\n", r);
+
+    SendMessageA(hWndTrackbar, TBM_SETRANGE, 0, MAKELPARAM(0, 30));
+
+    r = SendMessageA(hWndTrackbar, TBM_GETPAGESIZE, 0, 0);
+    ok(r == 10, "Unexpected page size %d.\n", r);
+
+    SendMessageA(hWndTrackbar, TBM_SETRANGEMIN, 0, 5);
+
+    r = SendMessageA(hWndTrackbar, TBM_GETPAGESIZE, 0, 0);
+    ok(r == 10, "Unexpected page size %d.\n", r);
+
+    SendMessageA(hWndTrackbar, TBM_SETRANGEMAX, 0, 40);
+
+    r = SendMessageA(hWndTrackbar, TBM_GETPAGESIZE, 0, 0);
+    ok(r == 10, "Unexpected page size %d.\n", r);
+
+    r = SendMessageA(hWndTrackbar, TBM_SETPAGESIZE, 0, -1);
+    ok(r == 10, "Unexpected page size %d.\n", r);
+
+    r = SendMessageA(hWndTrackbar, TBM_GETPAGESIZE, 0, 0);
+    ok(r == 7, "Unexpected page size %d.\n", r);
+
+    SendMessageA(hWndTrackbar, TBM_SETRANGEMAX, 0, 100);
+
+    r = SendMessageA(hWndTrackbar, TBM_GETPAGESIZE, 0, 0);
+    ok(r == 19, "Unexpected page size %d.\n", r);
+
+    DestroyWindow(hWndTrackbar);
+
+    hWndTrackbar = create_trackbar(defaultstyle, hWndParent);
+    ok(hWndTrackbar != NULL, "Failed to create trackbar window.\n");
+
     flush_sequences(sequences, NUM_MSG_SEQUENCE);
 
     /* test TBM_SETPAGESIZE */
@@ -879,7 +931,7 @@ static void test_selection(void)
 static void test_thumb_length(void)
 {
     HWND hWndTrackbar;
-    int r;
+    int r, r2;
 
     hWndTrackbar = create_trackbar(defaultstyle, hWndParent);
     ok(hWndTrackbar != NULL, "Expected non NULL value\n");
@@ -909,6 +961,22 @@ static void test_thumb_length(void)
 
     ok_sequence(sequences, TRACKBAR_SEQ_INDEX, thumb_length_test_seq, "thumb length test sequence", TRUE);
     ok_sequence(sequences, PARENT_SEQ_INDEX, parent_thumb_length_test_seq, "parent thumb length test sequence", TRUE);
+
+    DestroyWindow(hWndTrackbar);
+
+    /* Fixed thumb length does not depend on window size. */
+    hWndTrackbar = CreateWindowA(TRACKBAR_CLASSA, "Trackbar Control", WS_VISIBLE | TBS_ENABLESELRANGE
+            | TBS_FIXEDLENGTH, 0, 0, 0, 0, hWndParent, NULL, GetModuleHandleA(NULL), NULL);
+
+    r = SendMessageA(hWndTrackbar, TBM_GETTHUMBLENGTH, 0, 0);
+
+    DestroyWindow(hWndTrackbar);
+
+    hWndTrackbar = CreateWindowA(TRACKBAR_CLASSA, "Trackbar Control", WS_VISIBLE | TBS_ENABLESELRANGE
+            | TBS_FIXEDLENGTH, 0, 0, 200, 200, hWndParent, NULL, GetModuleHandleA(NULL), NULL);
+
+    r2 = SendMessageA(hWndTrackbar, TBM_GETTHUMBLENGTH, 0, 0);
+    ok(r2 == r, "Unexpected thumb length %d.\n", r);
 
     DestroyWindow(hWndTrackbar);
 }

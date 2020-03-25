@@ -8,13 +8,16 @@ list(APPEND SOURCE
     CreateWindowEx.c
     DeferWindowPos.c
     DestroyCursorIcon.c
+    DM_REPOSITION.c
     DrawIconEx.c
+    DrawText.c
     desktop.c
     EmptyClipboard.c
     EnumDisplaySettings.c
     GetDCEx.c
     GetIconInfo.c
     GetKeyState.c
+    GetMessageTime.c
     GetPeekMessage.c
     GetSystemMetrics.c
     GetUserObjectInformation.c
@@ -22,12 +25,14 @@ list(APPEND SOURCE
     InitializeLpkHooks.c
     LoadImage.c
     LookupIconIdFromDirectoryEx.c
+    MessageStateAnalyzer.c
     NextDlgItem.c
     PrivateExtractIcons.c
     RealGetWindowClass.c
     RedrawWindow.c
     RegisterClassEx.c
     RegisterHotKey.c
+    ScrollBarWndExtra.c
     ScrollDC.c
     ScrollWindowEx.c
     SendMessageTimeout.c

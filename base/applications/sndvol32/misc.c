@@ -128,9 +128,9 @@ LoadAndFormatString(IN HINSTANCE hInstance,
 }
 
 static const TCHAR AppRegSettings[] = TEXT("Software\\Microsoft\\Windows\\CurrentVersion\\Applets\\Volume Control");
-//static const TCHAR AppOptionsKey[] = TEXT("Options");
+static const TCHAR AppOptionsKey[] = TEXT("Options");
 static const TCHAR LineStatesValue[] = TEXT("LineStates");
-//static const TCHAR StyleValue[] = TEXT("Style");
+static const TCHAR StyleValue[] = TEXT("Style");
 
 HKEY hAppSettingsKey = NULL;
 
@@ -156,6 +156,116 @@ CloseAppConfig(VOID)
         RegCloseKey(hAppSettingsKey);
         hAppSettingsKey = NULL;
     }
+}
+
+BOOL
+LoadXYCoordWnd(IN PPREFERENCES_CONTEXT PrefContext)
+{
+    HKEY hKey;
+    LONG lResult;
+    TCHAR DeviceMixerSettings[256];
+    DWORD dwData;
+    DWORD cbData = sizeof(dwData);
+
+    /* Append the registry key path and device name key into one single string */
+    StringCchPrintf(DeviceMixerSettings, _countof(DeviceMixerSettings), TEXT("%s\\%s"), AppRegSettings, PrefContext->DeviceName);
+
+    lResult = RegOpenKeyEx(HKEY_CURRENT_USER,
+                           DeviceMixerSettings,
+                           0,
+                           KEY_READ,
+                           &hKey);
+    if (lResult != ERROR_SUCCESS)
+    {
+        return FALSE;
+    }
+
+    lResult = RegQueryValueEx(hKey,
+                              TEXT("X"),
+                              0,
+                              0,
+                              (LPBYTE)&dwData,
+                              &cbData);
+    if (lResult != ERROR_SUCCESS)
+    {
+        RegCloseKey(hKey);
+        return FALSE;
+    }
+
+    /* Cache the X coordinate point */
+    PrefContext->MixerWindow->WndPosX = dwData;
+
+    lResult = RegQueryValueEx(hKey,
+                              TEXT("Y"),
+                              0,
+                              0,
+                              (LPBYTE)&dwData,
+                              &cbData);
+    if (lResult != ERROR_SUCCESS)
+    {
+        RegCloseKey(hKey);
+        return FALSE;
+    }
+
+    /* Cache the Y coordinate point */
+    PrefContext->MixerWindow->WndPosY = dwData;
+    
+    RegCloseKey(hKey);
+    return TRUE;
+}
+
+BOOL
+SaveXYCoordWnd(IN HWND hWnd,
+               IN PPREFERENCES_CONTEXT PrefContext)
+{
+    HKEY hKey;
+    LONG lResult;
+    TCHAR DeviceMixerSettings[256];
+    WINDOWPLACEMENT wp;
+    
+    /* Get the placement coordinate data from the window */
+    wp.length = sizeof(WINDOWPLACEMENT);
+    GetWindowPlacement(hWnd, &wp);
+
+    /* Append the registry key path and device name key into one single string */
+    StringCchPrintf(DeviceMixerSettings, _countof(DeviceMixerSettings), TEXT("%s\\%s"), AppRegSettings, PrefContext->DeviceName);
+
+    lResult = RegOpenKeyEx(HKEY_CURRENT_USER,
+                           DeviceMixerSettings,
+                           0,
+                           KEY_SET_VALUE,
+                           &hKey);
+    if (lResult != ERROR_SUCCESS)
+    {
+        return FALSE;
+    }
+
+    lResult = RegSetValueEx(hKey,
+                            TEXT("X"),
+                            0,
+                            REG_DWORD,
+                            (LPBYTE)&wp.rcNormalPosition.left,
+                            sizeof(wp.rcNormalPosition.left));
+    if (lResult != ERROR_SUCCESS)
+    {
+        RegCloseKey(hKey);
+        return FALSE;
+    }
+
+    lResult = RegSetValueEx(hKey,
+                            TEXT("Y"),
+                            0,
+                            REG_DWORD,
+                            (LPBYTE)&wp.rcNormalPosition.top,
+                            sizeof(wp.rcNormalPosition.top));
+    if (lResult != ERROR_SUCCESS)
+    {
+        RegCloseKey(hKey);
+        return FALSE;
+    }
+
+    RegCloseKey(hKey);
+    return TRUE;
 }
 
 BOOL
@@ -272,4 +382,30 @@ ExitClose:
     }
 
     return Ret;
+}
+
+DWORD
+GetStyleValue(VOID)
+{
+    HKEY hOptionsKey;
+    DWORD dwStyle = 0, dwSize;
+
+    if (RegOpenKeyEx(hAppSettingsKey,
+                     AppOptionsKey,
+                     0,
+                     KEY_READ,
+                     &hOptionsKey) == ERROR_SUCCESS)
+    {
+        dwSize = sizeof(DWORD);
+        RegQueryValueEx(hOptionsKey,
+                        StyleValue,
+                        NULL,
+                        NULL,
+                        (LPBYTE)&dwStyle,
+                        &dwSize);
+
+        RegCloseKey(hOptionsKey);
+    }
+
+    return dwStyle;
 }

@@ -1,4 +1,5 @@
 
+add_definitions(-D__WINESRC__)
 include_directories(${REACTOS_SOURCE_DIR}/sdk/include/reactos/wine)
 spec2def(msacm32.dll msacm32.spec ADD_IMPORTLIB)
 
@@ -13,7 +14,7 @@ list(APPEND SOURCE
     precomp.h
     ${CMAKE_CURRENT_BINARY_DIR}/msacm32_stubs.c)
 
-add_library(msacm32 SHARED
+add_library(msacm32 MODULE
     ${SOURCE}
     msacm.rc
     ${CMAKE_CURRENT_BINARY_DIR}/msacm32.def)

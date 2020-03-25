@@ -271,6 +271,7 @@ public:
 
 
 BEGIN_OBJECT_MAP(ObjectMap)
+    OBJECT_ENTRY(CLSID_ActiveDesktop, CActiveDesktop)
     OBJECT_ENTRY(CLSID_ShellFSFolder, CFSFolder)
     OBJECT_ENTRY(CLSID_MyComputer, CDrivesFolder)
     OBJECT_ENTRY(CLSID_ShellDesktop, CDesktopFolder)
@@ -288,6 +289,7 @@ BEGIN_OBJECT_MAP(ObjectMap)
     OBJECT_ENTRY(CLSID_RecycleBin, CRecycleBin)
     OBJECT_ENTRY(CLSID_OpenWithMenu, COpenWithMenu)
     OBJECT_ENTRY(CLSID_NewMenu, CNewMenu)
+    OBJECT_ENTRY(CLSID_SendToMenu, CSendToMenu)
     OBJECT_ENTRY(CLSID_StartMenu, CStartMenuDummy)
     OBJECT_ENTRY(CLSID_MenuBandSite, CMenuSite)
     OBJECT_ENTRY(CLSID_MenuBand, CMenuBand)

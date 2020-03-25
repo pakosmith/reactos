@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2018, Intel Corp.
+ * Copyright (C) 2000 - 2020, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -51,7 +51,8 @@
 #endif
 
 
-#define ACPI_DEBUG_BUFFER_SIZE  0x4000      /* 16K buffer for return objects */
+#define ACPI_DEBUG_BUFFER_SIZE      0x4000      /* 16K buffer for return objects */
+#define ACPI_DEBUG_LENGTH_FORMAT    " (%.4X bits, %.3X bytes)"
 
 typedef struct acpi_db_command_info
 {
@@ -282,6 +283,10 @@ AcpiDbFindReferences (
 void
 AcpiDbGetBusInfo (
     void);
+
+ACPI_STATUS
+AcpiDbDisplayFields (
+    UINT32                  AddressSpaceId);
 
 
 /*

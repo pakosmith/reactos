@@ -33,6 +33,7 @@
 #include <ntdef.h>
 #include <ntifs.h>
 #include <wdmguid.h>
+#include <diskguid.h>
 #include <arc/arc.h>
 #include <mountmgr.h>
 #undef NTHALAPI
@@ -62,6 +63,7 @@
 #include <regstr.h>
 #include <ntstrsafe.h>
 #include <ntpoapi.h>
+#include <ntintsafe.h>
 
 /* C Headers */
 #include <stdlib.h>
@@ -92,6 +94,14 @@
 #include <srmp.h>
 
 #define ExRaiseStatus RtlRaiseStatus
+
+/* Also defined in fltkernel.h, but we don't want the entire header */
+#ifndef Add2Ptr
+#define Add2Ptr(P,I) ((PVOID)((PUCHAR)(P) + (I)))
+#endif
+#ifndef PtrOffset
+#define PtrOffset(B,O) ((ULONG)((ULONG_PTR)(O) - (ULONG_PTR)(B)))
+#endif
 
 //
 // Switch for enabling global page support

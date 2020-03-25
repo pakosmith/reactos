@@ -86,6 +86,7 @@ extern PCLS DesktopWindowClass;
 extern HDC ScreenDeviceContext;
 extern PTHREADINFO gptiForeground;
 extern PTHREADINFO gptiDesktopThread;
+extern PKEVENT gpDesktopThreadStartedEvent;
 
 typedef struct _SHELL_HOOK_WINDOW
 {
@@ -356,5 +357,6 @@ BOOL FASTCALL IntPaintDesktop(HDC);
 BOOL FASTCALL DesktopWindowProc(PWND, UINT, WPARAM, LPARAM, LRESULT *);
 BOOL FASTCALL UserMessageWindowProc(PWND pwnd, UINT Msg, WPARAM wParam, LPARAM lParam, LRESULT *lResult);
 VOID NTAPI DesktopThreadMain(VOID);
+HDESK UserOpenInputDesktop(DWORD dwFlags, BOOL fInherit, ACCESS_MASK dwDesiredAccess);
 
 /* EOF */

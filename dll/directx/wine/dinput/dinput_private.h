@@ -27,6 +27,8 @@
 #include "dinputd.h"
 #include "wine/list.h"
 
+extern HINSTANCE DINPUT_instance;
+
 /* Implementation specification */
 typedef struct IDirectInputImpl IDirectInputImpl;
 struct IDirectInputImpl
@@ -79,6 +81,7 @@ extern void _copy_diactionformatWtoA(LPDIACTIONFORMATA, LPDIACTIONFORMATW) DECLS
 extern HRESULT _configure_devices(IDirectInput8W *iface, LPDICONFIGUREDEVICESCALLBACK lpdiCallback, LPDICONFIGUREDEVICESPARAMSW lpdiCDParams, DWORD dwFlags, LPVOID pvRefData) DECLSPEC_HIDDEN;
 
 extern WCHAR* get_mapping_path(const WCHAR *device, const WCHAR *username) DECLSPEC_HIDDEN;
+extern DWORD get_device_type(DWORD version, BOOL is_joystick) DECLSPEC_HIDDEN;
 
 #define IS_DIPROP(x)    (((ULONG_PTR)(x) >> 16) == 0)
 

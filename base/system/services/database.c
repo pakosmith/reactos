@@ -31,6 +31,7 @@ LIST_ENTRY ServiceListHead;
 static RTL_RESOURCE DatabaseLock;
 static DWORD ResumeCount = 1;
 static DWORD NoInteractiveServices = 0;
+static DWORD ServiceTag = 0;
 
 /* The critical section synchronizes service control requests */
 static CRITICAL_SECTION ControlServiceCriticalSection;
@@ -39,62 +40,95 @@ static DWORD PipeTimeout = 30000; /* 30 Seconds */
 
 /* FUNCTIONS *****************************************************************/
 
+static
+BOOL
+ScmIsSecurityService(
+    _In_ PSERVICE_IMAGE pServiceImage)
+{
+    return (wcsstr(pServiceImage->pszImagePath, L"\\system32\\lsass.exe") != NULL);
+}
+
+
 static DWORD
-ScmCreateNewControlPipe(PSERVICE_IMAGE pServiceImage)
+ScmCreateNewControlPipe(
+    _In_ PSERVICE_IMAGE pServiceImage,
+    _In_ BOOL bSecurityServiceProcess)
 {
     WCHAR szControlPipeName[MAX_PATH + 1];
+    SECURITY_ATTRIBUTES SecurityAttributes;
     HKEY hServiceCurrentKey = INVALID_HANDLE_VALUE;
-    DWORD ServiceCurrent = 0;
-    DWORD KeyDisposition;
+    DWORD dwServiceCurrent = 1;
+    DWORD dwKeyDisposition;
     DWORD dwKeySize;
     DWORD dwError;
 
     /* Get the service number */
-    /* TODO: Create registry entry with correct write access */
-    dwError = RegCreateKeyExW(HKEY_LOCAL_MACHINE,
-                              L"SYSTEM\\CurrentControlSet\\Control\\ServiceCurrent", 0, NULL,
-                              REG_OPTION_VOLATILE,
-                              KEY_WRITE | KEY_READ,
-                              NULL,
-                              &hServiceCurrentKey,
-                              &KeyDisposition);
-    if (dwError != ERROR_SUCCESS)
+    if (bSecurityServiceProcess == FALSE)
     {
-        DPRINT1("RegCreateKeyEx() failed with error %lu\n", dwError);
-        return dwError;
-    }
-
-    if (KeyDisposition == REG_OPENED_EXISTING_KEY)
-    {
-        dwKeySize = sizeof(DWORD);
-        dwError = RegQueryValueExW(hServiceCurrentKey,
-                                   L"", 0, NULL, (BYTE*)&ServiceCurrent, &dwKeySize);
-
+        /* TODO: Create registry entry with correct write access */
+        dwError = RegCreateKeyExW(HKEY_LOCAL_MACHINE,
+                                  L"SYSTEM\\CurrentControlSet\\Control\\ServiceCurrent",
+                                  0,
+                                  NULL,
+                                  REG_OPTION_VOLATILE,
+                                  KEY_WRITE | KEY_READ,
+                                  NULL,
+                                  &hServiceCurrentKey,
+                                  &dwKeyDisposition);
         if (dwError != ERROR_SUCCESS)
         {
-            RegCloseKey(hServiceCurrentKey);
-            DPRINT1("RegQueryValueEx() failed with error %lu\n", dwError);
+            DPRINT1("RegCreateKeyEx() failed with error %lu\n", dwError);
             return dwError;
         }
 
-        ServiceCurrent++;
+        if (dwKeyDisposition == REG_OPENED_EXISTING_KEY)
+        {
+            dwKeySize = sizeof(DWORD);
+            dwError = RegQueryValueExW(hServiceCurrentKey,
+                                       L"",
+                                       0,
+                                       NULL,
+                                       (BYTE*)&dwServiceCurrent,
+                                       &dwKeySize);
+            if (dwError != ERROR_SUCCESS)
+            {
+                RegCloseKey(hServiceCurrentKey);
+                DPRINT1("RegQueryValueEx() failed with error %lu\n", dwError);
+                return dwError;
+            }
+
+            dwServiceCurrent++;
+        }
+
+        dwError = RegSetValueExW(hServiceCurrentKey,
+                                 L"",
+                                 0,
+                                 REG_DWORD,
+                                 (BYTE*)&dwServiceCurrent,
+                                 sizeof(dwServiceCurrent));
+
+        RegCloseKey(hServiceCurrentKey);
+
+        if (dwError != ERROR_SUCCESS)
+        {
+            DPRINT1("RegSetValueExW() failed (Error %lu)\n", dwError);
+            return dwError;
+        }
     }
-
-    dwError = RegSetValueExW(hServiceCurrentKey, L"", 0, REG_DWORD, (BYTE*)&ServiceCurrent, sizeof(ServiceCurrent));
-
-    RegCloseKey(hServiceCurrentKey);
-
-    if (dwError != ERROR_SUCCESS)
+    else
     {
-        DPRINT1("RegSetValueExW() failed (Error %lu)\n", dwError);
-        return dwError;
+        dwServiceCurrent = 0;
     }
 
     /* Create '\\.\pipe\net\NtControlPipeXXX' instance */
     StringCchPrintfW(szControlPipeName, ARRAYSIZE(szControlPipeName),
-                     L"\\\\.\\pipe\\net\\NtControlPipe%lu", ServiceCurrent);
+                     L"\\\\.\\pipe\\net\\NtControlPipe%lu", dwServiceCurrent);
 
     DPRINT("PipeName: %S\n", szControlPipeName);
+
+    SecurityAttributes.nLength = sizeof(SecurityAttributes);
+    SecurityAttributes.lpSecurityDescriptor = pPipeSD;
+    SecurityAttributes.bInheritHandle = FALSE;
 
     pServiceImage->hControlPipe = CreateNamedPipeW(szControlPipeName,
                                                    PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,
@@ -103,7 +137,7 @@ ScmCreateNewControlPipe(PSERVICE_IMAGE pServiceImage)
                                                    8000,
                                                    4,
                                                    PipeTimeout,
-                                                   NULL);
+                                                   &SecurityAttributes);
     DPRINT("CreateNamedPipeW(%S) done\n", szControlPipeName);
     if (pServiceImage->hControlPipe == INVALID_HANDLE_VALUE)
     {
@@ -142,6 +176,92 @@ ScmGetServiceImageByImagePath(LPWSTR lpImagePath)
 
     return NULL;
 
+}
+
+
+DWORD
+ScmGetServiceNameFromTag(IN PTAG_INFO_NAME_FROM_TAG_IN_PARAMS InParams,
+                         OUT PTAG_INFO_NAME_FROM_TAG_OUT_PARAMS *OutParams)
+{
+    PLIST_ENTRY ServiceEntry;
+    PSERVICE CurrentService;
+    PSERVICE_IMAGE CurrentImage;
+    PTAG_INFO_NAME_FROM_TAG_OUT_PARAMS OutBuffer = NULL;
+    DWORD dwError;
+
+    /* Lock the database */
+    ScmLockDatabaseExclusive();
+
+    /* Find the matching service */
+    ServiceEntry = ServiceListHead.Flink;
+    while (ServiceEntry != &ServiceListHead)
+    {
+        CurrentService = CONTAINING_RECORD(ServiceEntry,
+                                           SERVICE,
+                                           ServiceListEntry);
+
+        /* We must match the tag */
+        if (CurrentService->dwTag == InParams->dwTag &&
+            CurrentService->lpImage != NULL)
+        {
+            CurrentImage = CurrentService->lpImage;
+            /* And matching the PID */
+            if (CurrentImage->dwProcessId == InParams->dwPid)
+            {
+                break;
+            }
+        }
+
+        ServiceEntry = ServiceEntry->Flink;
+    }
+
+    /* No match! */
+    if (ServiceEntry == &ServiceListHead)
+    {
+        dwError = ERROR_RETRY;
+        goto Cleanup;
+    }
+
+    /* Allocate the output buffer */
+    OutBuffer = MIDL_user_allocate(sizeof(TAG_INFO_NAME_FROM_TAG_OUT_PARAMS));
+    if (OutBuffer == NULL)
+    {
+        dwError = ERROR_NOT_ENOUGH_MEMORY;
+        goto Cleanup;
+    }
+
+    /* And the buffer for the name */
+    OutBuffer->pszName = MIDL_user_allocate(wcslen(CurrentService->lpServiceName) * sizeof(WCHAR) + sizeof(UNICODE_NULL));
+    if (OutBuffer->pszName == NULL)
+    {
+        dwError = ERROR_NOT_ENOUGH_MEMORY;
+        goto Cleanup;
+    }
+
+    /* Fill in output data */
+    wcscpy(OutBuffer->pszName, CurrentService->lpServiceName);
+    OutBuffer->TagType = TagTypeService;
+
+    /* And return */
+    *OutParams = OutBuffer;
+    dwError = ERROR_SUCCESS;
+
+Cleanup:
+
+    /* Unlock database */
+    ScmUnlockDatabase();
+
+    /* If failure, free allocated memory */
+    if (dwError != ERROR_SUCCESS)
+    {
+        if (OutBuffer != NULL)
+        {
+            MIDL_user_free(OutBuffer);
+        }
+    }
+
+    /* Return error/success */
+    return dwError;
 }
 
 
@@ -188,22 +308,69 @@ ScmIsLocalSystemAccount(
 
 
 static
+BOOL
+ScmEnableBackupRestorePrivileges(
+    _In_ HANDLE hToken,
+    _In_ BOOL bEnable)
+{
+    PTOKEN_PRIVILEGES pTokenPrivileges = NULL;
+    DWORD dwSize;
+    BOOL bRet = FALSE;
+
+    DPRINT("ScmEnableBackupRestorePrivileges(%p %d)\n", hToken, bEnable);
+
+    dwSize = sizeof(TOKEN_PRIVILEGES) + 2 * sizeof(LUID_AND_ATTRIBUTES);
+    pTokenPrivileges = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, dwSize);
+    if (pTokenPrivileges == NULL)
+    {
+        DPRINT1("Failed to allocate the privilege buffer!\n");
+        goto done;
+    }
+
+    pTokenPrivileges->PrivilegeCount = 2;
+    pTokenPrivileges->Privileges[0].Luid.LowPart = SE_BACKUP_PRIVILEGE;
+    pTokenPrivileges->Privileges[0].Luid.HighPart = 0;
+    pTokenPrivileges->Privileges[0].Attributes = (bEnable ? SE_PRIVILEGE_ENABLED : 0);
+    pTokenPrivileges->Privileges[1].Luid.LowPart = SE_RESTORE_PRIVILEGE;
+    pTokenPrivileges->Privileges[1].Luid.HighPart = 0;
+    pTokenPrivileges->Privileges[1].Attributes = (bEnable ? SE_PRIVILEGE_ENABLED : 0);
+
+    bRet = AdjustTokenPrivileges(hToken, FALSE, pTokenPrivileges, 0, NULL, NULL);
+    if (!bRet)
+    {
+        DPRINT1("AdjustTokenPrivileges() failed with error %lu\n", GetLastError());
+    }
+    else if (GetLastError() == ERROR_NOT_ALL_ASSIGNED)
+    {
+        DPRINT1("AdjustTokenPrivileges() succeeded, but with not all privileges assigned\n");
+        bRet = FALSE;
+    }
+
+done:
+    if (pTokenPrivileges != NULL)
+        HeapFree(GetProcessHeap(), 0, pTokenPrivileges);
+
+    return bRet;
+}
+
+
+static
 DWORD
 ScmLogonService(
     IN PSERVICE pService,
     IN PSERVICE_IMAGE pImage)
 {
-    DWORD dwError = ERROR_SUCCESS;
     PROFILEINFOW ProfileInfo;
     PWSTR pszUserName = NULL;
     PWSTR pszDomainName = NULL;
     PWSTR pszPassword = NULL;
     PWSTR ptr;
+    DWORD dwError = ERROR_SUCCESS;
 
     DPRINT("ScmLogonService(%p %p)\n", pService, pImage);
     DPRINT("Service %S\n", pService->lpServiceName);
 
-    if (ScmIsLocalSystemAccount(pImage->pszAccountName))
+    if (ScmIsLocalSystemAccount(pImage->pszAccountName) || ScmLiveSetup)
         return ERROR_SUCCESS;
 
     /* Get the user and domain names */
@@ -263,9 +430,13 @@ ScmLogonService(
     // ProfileInfo.lpPolicyPath = NULL;
     // ProfileInfo.hProfile = NULL;
 
+    ScmEnableBackupRestorePrivileges(pImage->hToken, TRUE);
     if (!LoadUserProfileW(pImage->hToken, &ProfileInfo))
-    {
         dwError = GetLastError();
+    ScmEnableBackupRestorePrivileges(pImage->hToken, FALSE);
+
+    if (dwError != ERROR_SUCCESS)
+    {
         DPRINT1("LoadUserProfileW() failed (Error %lu)\n", dwError);
         goto done;
     }
@@ -294,6 +465,7 @@ ScmCreateOrReferenceServiceImage(PSERVICE pService)
     DWORD dwError = ERROR_SUCCESS;
     DWORD dwRecordSize;
     LPWSTR pString;
+    BOOL bSecurityService;
 
     DPRINT("ScmCreateOrReferenceServiceImage(%p)\n", pService);
 
@@ -375,15 +547,22 @@ ScmCreateOrReferenceServiceImage(PSERVICE pService)
             goto done;
         }
 
+        bSecurityService = ScmIsSecurityService(pServiceImage);
+
         /* Create the control pipe */
-        dwError = ScmCreateNewControlPipe(pServiceImage);
+        dwError = ScmCreateNewControlPipe(pServiceImage,
+                                          bSecurityService);
         if (dwError != ERROR_SUCCESS)
         {
             DPRINT1("ScmCreateNewControlPipe() failed (Error %lu)\n", dwError);
 
             /* Unload the user profile */
             if (pServiceImage->hProfile != NULL)
+            {
+                ScmEnableBackupRestorePrivileges(pServiceImage->hToken, TRUE);
                 UnloadUserProfile(pServiceImage->hToken, pServiceImage->hProfile);
+                ScmEnableBackupRestorePrivileges(pServiceImage->hToken, FALSE);
+            }
 
             /* Close the logon token */
             if (pServiceImage->hToken != NULL)
@@ -393,6 +572,11 @@ ScmCreateOrReferenceServiceImage(PSERVICE pService)
             HeapFree(GetProcessHeap(), 0, pServiceImage);
 
             goto done;
+        }
+
+        if (bSecurityService)
+        {
+            SetSecurityServicesEvent();
         }
 
         /* FIXME: Add more initialization code here */
@@ -454,7 +638,11 @@ ScmRemoveServiceImage(PSERVICE_IMAGE pServiceImage)
 
     /* Unload the user profile */
     if (pServiceImage->hProfile != NULL)
+    {
+        ScmEnableBackupRestorePrivileges(pServiceImage->hToken, TRUE);
         UnloadUserProfile(pServiceImage->hToken, pServiceImage->hProfile);
+        ScmEnableBackupRestorePrivileges(pServiceImage->hToken, FALSE);
+    }
 
     /* Close the logon token */
     if (pServiceImage->hToken != NULL)
@@ -549,6 +737,29 @@ ScmGetServiceEntryByResumeCount(DWORD dwResumeCount)
     DPRINT("Couldn't find a matching service\n");
 
     return NULL;
+}
+
+
+DWORD
+ScmGenerateServiceTag(PSERVICE lpServiceRecord)
+{
+    /* Check for an overflow */
+    if (ServiceTag == -1)
+    {
+        return ERROR_INVALID_DATA;
+    }
+
+    /* This is only valid for Win32 services */
+    if (!(lpServiceRecord->Status.dwServiceType & SERVICE_WIN32))
+    {
+        return ERROR_INVALID_PARAMETER;
+    }
+
+    /* Increment the tag counter and set it */
+    ServiceTag = ServiceTag % 0xFFFFFFFF + 1;
+    lpServiceRecord->dwTag = ServiceTag;
+
+    return ERROR_SUCCESS;
 }
 
 
@@ -765,6 +976,8 @@ CreateServiceListEntry(LPCWSTR lpServiceName,
 
     if (ScmIsDeleteFlagSet(hServiceKey))
         lpService->bDeleted = TRUE;
+    else
+        ScmGenerateServiceTag(lpService);
 
     if (lpService->Status.dwServiceType & SERVICE_WIN32)
     {
@@ -1323,6 +1536,7 @@ ScmSendStartCommand(PSERVICE Service,
                                ? SERVICE_CONTROL_START_OWN
                                : SERVICE_CONTROL_START_SHARE;
     ControlPacket->hServiceStatus = (SERVICE_STATUS_HANDLE)Service;
+    ControlPacket->dwServiceTag = Service->dwTag;
 
     /* Copy the start command line */
     ControlPacket->dwServiceNameOffset = sizeof(SCM_CONTROL_PACKET);
@@ -1629,7 +1843,8 @@ ScmWaitForServiceConnect(PSERVICE Service)
         }
     }
 
-    if (dwProcessId != Service->lpImage->dwProcessId)
+    if ((ScmIsSecurityService(Service->lpImage) == FALSE)&&
+        (dwProcessId != Service->lpImage->dwProcessId))
     {
 #if 0
         _ultow(Service->lpImage->dwProcessId, szBuffer1, 10);
@@ -1739,18 +1954,26 @@ ScmStartUserModeService(PSERVICE Service,
             StartupInfo.lpDesktop = L"WinSta0\\Default";
         }
 
-        Result = CreateProcessW(NULL,
-                                Service->lpImage->pszImagePath,
-                                NULL,
-                                NULL,
-                                FALSE,
-                                CREATE_UNICODE_ENVIRONMENT | DETACHED_PROCESS | CREATE_SUSPENDED,
-                                lpEnvironment,
-                                NULL,
-                                &StartupInfo,
-                                &ProcessInformation);
-        if (!Result)
-            dwError = GetLastError();
+        if (!ScmIsSecurityService(Service->lpImage))
+        {
+            Result = CreateProcessW(NULL,
+                                    Service->lpImage->pszImagePath,
+                                    NULL,
+                                    NULL,
+                                    FALSE,
+                                    CREATE_UNICODE_ENVIRONMENT | DETACHED_PROCESS | CREATE_SUSPENDED,
+                                    lpEnvironment,
+                                    NULL,
+                                    &StartupInfo,
+                                    &ProcessInformation);
+            if (!Result)
+                dwError = GetLastError();
+        }
+        else
+        {
+            Result = TRUE;
+            dwError = ERROR_SUCCESS;
+        }
     }
 
     if (lpEnvironment)

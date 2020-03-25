@@ -47,6 +47,9 @@ IDR_AUTOCOMPLETE REGISTRY "res/autocomplete.rgs"
 IDR_ACLISTISF REGISTRY "res/shellautocomplete.rgs"
 IDR_ISFBAND REGISTRY "res/isfband.rgs"
 IDR_ACLCUSTOMMRU REGISTRY "res/custommru.rgs"
+IDR_TASKBARLIST REGISTRY "res/taskbarlist.rgs"
+IDR_FILESEARCHBAND REGISTRY "res/filesearchband.rgs"
+IDR_FINDFOLDER REGISTRY "res/findfolder.rgs"
 
 #include <reactos/manifest_dll.rc>
 
@@ -79,6 +82,15 @@ IDR_ACLCUSTOMMRU REGISTRY "res/custommru.rgs"
 #ifdef LANGUAGE_HE_IL
     #include "lang/he-IL.rc"
 #endif
+#ifdef LANGUAGE_HI_IN
+    #include "lang/hi-IN.rc"
+#endif
+#ifdef LANGUAGE_HU_HU
+    #include "lang/hu-HU.rc"
+#endif
+#ifdef LANGUAGE_ID_ID
+    #include "lang/id-ID.rc"
+#endif
 #ifdef LANGUAGE_IT_IT
     #include "lang/it-IT.rc"
 #endif
@@ -90,6 +102,9 @@ IDR_ACLCUSTOMMRU REGISTRY "res/custommru.rgs"
 #endif
 #ifdef LANGUAGE_PT_BR
     #include "lang/pt-BR.rc"
+#endif
+#ifdef LANGUAGE_PT_PT
+    #include "lang/pt-PT.rc"
 #endif
 #ifdef LANGUAGE_RO_RO
     #include "lang/ro-RO.rc"

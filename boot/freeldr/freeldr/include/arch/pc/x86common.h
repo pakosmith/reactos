@@ -54,11 +54,10 @@
 /* Realmode function IDs */
 #define FNID_Int386 0
 #define FNID_Reboot 1
-#define FNID_ChainLoadBiosBootSectorCode 2
+#define FNID_Relocator16Boot 2
 #define FNID_PxeCallApi 3
-#define FNID_PnpBiosGetDeviceNodeCount 4
-#define FNID_PnpBiosGetDeviceNode 5
-#define FNID_BootLinuxKernel 6
+#define FNID_PnpBiosGetDeviceNodeCount  4
+#define FNID_PnpBiosGetDeviceNode       5
 
 /* Flag Masks */
 #define CR0_PE_SET    HEX(00000001)    /* OR this value with CR0 to enable pmode */
@@ -66,7 +65,7 @@
 
 /* Defines needed for switching between real and protected mode */
 //#ifdef _M_IX86
-#define NULL_DESC    HEX(00)    /* NULL descriptor */
+#define NULL_DESC   HEX(00)    /* NULL descriptor */
 #define PMODE_CS    HEX(08)    /* PMode code selector, base 0 limit 4g */
 #define PMODE_DS    HEX(10)    /* PMode data selector, base 0 limit 4g */
 #define RMODE_CS    HEX(18)    /* RMode code selector, base 0 limit 64k */
@@ -77,6 +76,3 @@
 #define LMODE_DS HEX(18)
 #define CMODE_CS HEX(30)
 //#endif
-
-/* Makes "x" a global variable or label */
-#define EXTERN(x)    .global x; x:

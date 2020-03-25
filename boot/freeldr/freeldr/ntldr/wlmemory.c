@@ -12,12 +12,11 @@
 #include "winldr.h"
 
 #include <debug.h>
-
 DBG_DEFAULT_CHANNEL(WINDOWS);
 
 extern ULONG LoaderPagesSpanned;
 
-PCHAR  MemTypeDesc[]  = {
+static const PCSTR MemTypeDesc[] = {
     "ExceptionBlock    ", // ?
     "SystemBlock       ", // ?
     "Free              ",

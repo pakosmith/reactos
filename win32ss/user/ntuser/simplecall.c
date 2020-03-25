@@ -342,7 +342,7 @@ NtUserCallOneParam(
         case ONEPARAM_ROUTINE_SETPROCDEFLAYOUT:
         {
             PPROCESSINFO ppi;
-            if (Param & LAYOUT_ORIENTATIONMASK)
+            if (Param & LAYOUT_ORIENTATIONMASK || Param == LAYOUT_LTR)
             {
                 ppi = PsGetCurrentProcessWin32Process();
                 ppi->dwLayout = Param;
@@ -392,7 +392,7 @@ NtUserCallOneParam(
            break;
 
         case ONEPARAM_ROUTINE_CREATESYSTEMTHREADS:
-            Result = CreateSystemThreads(Param);
+            Result = UserSystemThreadProc(Param);
             break;
 
         case ONEPARAM_ROUTINE_LOCKFOREGNDWINDOW:
@@ -513,6 +513,11 @@ NtUserCallTwoParam(
             Window = UserGetWindowObject(hwnd);
             if (!Window)
             {
+                break;
+            }
+            if (MsqIsHung(Window->head.pti, MSQ_HUNG))
+            {
+                // TODO: Make the window ghosted and activate.
                 break;
             }
             if (fAltTab)

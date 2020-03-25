@@ -19,9 +19,6 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#include "config.h"
-#include "wine/port.h"
-
 #include <stdarg.h>
 
 #define COBJMACROS
@@ -49,13 +46,6 @@ static LONG WINAPI stub_filter(EXCEPTION_POINTERS *eptr)
         return EXCEPTION_CONTINUE_SEARCH;
     return EXCEPTION_EXECUTE_HANDLER;
 }
-
-typedef struct
-{
-    IUnknownVtbl *base_obj;
-    IRpcStubBuffer *base_stub;
-    CStdStubBuffer stub_buffer;
-} cstdstubbuffer_delegating_t;
 
 static inline cstdstubbuffer_delegating_t *impl_from_delegating( IRpcStubBuffer *iface )
 {
@@ -175,11 +165,40 @@ typedef struct
 static const BYTE opcodes[16] = { 0x48, 0x8b, 0x49, 0x20, 0x48, 0x8b, 0x01,
                                   0xff, 0xa0, 0, 0, 0, 0, 0x48, 0x8d, 0x36 };
 #elif defined(__arm__)
+
+static const DWORD opcodes[] =
+{
+    0xe52d4004,    /* push {r4} */
+    0xe5900010,    /* ldr r0, [r0, #16] */
+    0xe5904000,    /* ldr r4, [r0] */
+    0xe59fc008,    /* ldr ip, [pc, #8] */
+    0xe08cc004,    /* add ip, ip, r4 */
+    0xe49d4004,    /* pop {r4} */
+    0xe59cf000     /* ldr pc, [ip] */
+};
+
 typedef struct
 {
+    DWORD opcodes[ARRAY_SIZE(opcodes)];
     DWORD offset;
 } vtbl_method_t;
-static const BYTE opcodes[1];
+
+#elif defined(__aarch64__)
+
+static const DWORD opcodes[] =
+{
+    0xf9401000,   /* ldr x0, [x0,#32] */
+    0xf9400010,   /* ldr x16, [x0] */
+    0x18000071,   /* ldr w17, offset */
+    0xf8716a10,   /* ldr x16, [x16,x17] */
+    0xd61f0200    /* br x16 */
+};
+
+typedef struct
+{
+    DWORD opcodes[ARRAY_SIZE(opcodes)];
+    DWORD offset;
+} vtbl_method_t;
 
 #else
 
@@ -267,7 +286,7 @@ BOOL fill_delegated_proxy_table(IUnknownVtbl *vtbl, DWORD num)
     return TRUE;
 }
 
-static IUnknownVtbl *get_delegating_vtbl(DWORD num_methods)
+IUnknownVtbl *get_delegating_vtbl(DWORD num_methods)
 {
     IUnknownVtbl *ret;
 
@@ -303,7 +322,7 @@ static IUnknownVtbl *get_delegating_vtbl(DWORD num_methods)
     return ret;
 }
 
-static void release_delegating_vtbl(IUnknownVtbl *vtbl)
+void release_delegating_vtbl(IUnknownVtbl *vtbl)
 {
     ref_counted_vtbl *table = (ref_counted_vtbl*)((DWORD *)vtbl - 1);
 

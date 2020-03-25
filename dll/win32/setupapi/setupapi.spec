@@ -223,8 +223,8 @@
 @ stub SetupAddSectionToDiskSpaceListW
 @ stdcall SetupAddToDiskSpaceListA(long str int64 long ptr long)
 @ stdcall SetupAddToDiskSpaceListW(long wstr int64 long ptr long)
-@ stub SetupAddToSourceListA
-@ stub SetupAddToSourceListW
+@ stdcall SetupAddToSourceListA(long str)
+@ stdcall SetupAddToSourceListW(long wstr)
 @ stub SetupAdjustDiskSpaceListA
 @ stub SetupAdjustDiskSpaceListW
 @ stub SetupBackupErrorA
@@ -281,7 +281,7 @@
 @ stdcall SetupDiCreateDeviceInterfaceW(ptr ptr ptr wstr long ptr)
 @ stdcall SetupDiDeleteDevRegKey(ptr ptr long long long)
 @ stdcall SetupDiDeleteDeviceInfo(long ptr)
-@ stub SetupDiDeleteDeviceInterfaceData
+@ stdcall SetupDiDeleteDeviceInterfaceData(ptr ptr)
 @ stdcall SetupDiDeleteDeviceInterfaceRegKey(ptr ptr long)
 @ stdcall SetupDiDestroyClassImageList(ptr)
 @ stdcall SetupDiDestroyDeviceInfoList(long)
@@ -369,7 +369,7 @@
 @ stdcall SetupDiRegisterDeviceInfo(ptr ptr long ptr ptr ptr)
 @ stdcall SetupDiRemoveDevice(ptr ptr)
 @ stdcall SetupDiRemoveDeviceInterface(ptr ptr)
-@ stub SetupDiRestartDevices
+@ stdcall SetupDiRestartDevices(ptr ptr)
 @ stdcall SetupDiSelectBestCompatDrv(ptr ptr)
 @ stdcall SetupDiSelectDevice(ptr ptr)
 @ stub SetupDiSelectOEMDrv
@@ -423,7 +423,7 @@
 @ stdcall SetupGetLineTextW(ptr long wstr wstr ptr long ptr)
 @ stdcall SetupGetMultiSzFieldA(ptr long ptr long ptr)
 @ stdcall SetupGetMultiSzFieldW(ptr long ptr long ptr)
-@ stub SetupGetNonInteractiveMode
+@ stdcall SetupGetNonInteractiveMode()
 @ stdcall SetupGetSourceFileLocationA(ptr ptr str ptr ptr long ptr)
 @ stdcall SetupGetSourceFileLocationW(ptr ptr wstr ptr ptr long ptr)
 @ stub SetupGetSourceFileSizeA

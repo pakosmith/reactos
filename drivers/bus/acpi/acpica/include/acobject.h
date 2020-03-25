@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2018, Intel Corp.
+ * Copyright (C) 2000 - 2020, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -225,8 +225,8 @@ typedef struct acpi_object_method
     } Dispatch;
 
     UINT32                          AmlLength;
-    UINT8                           ThreadCount;
     ACPI_OWNER_ID                   OwnerId;
+    UINT8                           ThreadCount;
 
 } ACPI_OBJECT_METHOD;
 
@@ -345,6 +345,7 @@ typedef struct acpi_object_region_field
     union acpi_operand_object       *RegionObj;         /* Containing OpRegion object */
     UINT8                           *ResourceBuffer;    /* ResourceTemplate for serial regions/fields */
     UINT16                          PinNumberIndex;     /* Index relative to previous Connection/Template */
+    UINT8                           *InternalPccBuffer; /* Internal buffer for fields associated with PCC */
 
 } ACPI_OBJECT_REGION_FIELD;
 
@@ -380,6 +381,7 @@ typedef struct acpi_object_buffer_field
 {
     ACPI_OBJECT_COMMON_HEADER
     ACPI_COMMON_FIELD_INFO
+    BOOLEAN                         IsCreateField;      /* Special case for objects created by CreateField() */
     union acpi_operand_object       *BufferObj;         /* Containing Buffer object */
 
 } ACPI_OBJECT_BUFFER_FIELD;

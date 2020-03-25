@@ -1,5 +1,6 @@
 /*
  * Copyright 2010 Vincent Povirk for CodeWeavers
+ * Copyright 2016 Dmitry Timoshkov
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -119,11 +120,11 @@ static HRESULT WINAPI BitmapScaler_GetSize(IWICBitmapScaler *iface,
     BitmapScaler *This = impl_from_IWICBitmapScaler(iface);
     TRACE("(%p,%p,%p)\n", iface, puiWidth, puiHeight);
 
+    if (!This->source)
+        return WINCODEC_ERR_NOTINITIALIZED;
+
     if (!puiWidth || !puiHeight)
         return E_INVALIDARG;
-
-    if (!This->source)
-        return WINCODEC_ERR_WRONGSTATE;
 
     *puiWidth = This->width;
     *puiHeight = This->height;
@@ -141,7 +142,10 @@ static HRESULT WINAPI BitmapScaler_GetPixelFormat(IWICBitmapScaler *iface,
         return E_INVALIDARG;
 
     if (!This->source)
-        return WINCODEC_ERR_WRONGSTATE;
+    {
+        memcpy(pPixelFormat, &GUID_WICPixelFormatDontCare, sizeof(*pPixelFormat));
+        return S_OK;
+    }
 
     return IWICBitmapSource_GetPixelFormat(This->source, pPixelFormat);
 }
@@ -152,11 +156,11 @@ static HRESULT WINAPI BitmapScaler_GetResolution(IWICBitmapScaler *iface,
     BitmapScaler *This = impl_from_IWICBitmapScaler(iface);
     TRACE("(%p,%p,%p)\n", iface, pDpiX, pDpiY);
 
+    if (!This->source)
+        return WINCODEC_ERR_NOTINITIALIZED;
+
     if (!pDpiX || !pDpiY)
         return E_INVALIDARG;
-
-    if (!This->source)
-        return WINCODEC_ERR_WRONGSTATE;
 
     return IWICBitmapSource_GetResolution(This->source, pDpiX, pDpiY);
 }
@@ -171,7 +175,7 @@ static HRESULT WINAPI BitmapScaler_CopyPalette(IWICBitmapScaler *iface,
         return E_INVALIDARG;
 
     if (!This->source)
-        return WINCODEC_ERR_WRONGSTATE;
+        return WINCODEC_ERR_PALETTEUNAVAILABLE;
 
     return IWICBitmapSource_CopyPalette(This->source, pIPalette);
 }
@@ -215,13 +219,13 @@ static HRESULT WINAPI BitmapScaler_CopyPixels(IWICBitmapScaler *iface,
     ULONG buffer_size;
     UINT y;
 
-    TRACE("(%p,%p,%u,%u,%p)\n", iface, prc, cbStride, cbBufferSize, pbBuffer);
+    TRACE("(%p,%s,%u,%u,%p)\n", iface, debug_wic_rect(prc), cbStride, cbBufferSize, pbBuffer);
 
     EnterCriticalSection(&This->lock);
 
     if (!This->source)
     {
-        hr = WINCODEC_ERR_WRONGSTATE;
+        hr = WINCODEC_ERR_NOTINITIALIZED;
         goto end;
     }
 
@@ -320,6 +324,9 @@ static HRESULT WINAPI BitmapScaler_Initialize(IWICBitmapScaler *iface,
 
     TRACE("(%p,%p,%u,%u,%u)\n", iface, pISource, uiWidth, uiHeight, mode);
 
+    if (!pISource || !uiWidth || !uiHeight)
+        return E_INVALIDARG;
+
     EnterCriticalSection(&This->lock);
 
     if (This->source)
@@ -389,30 +396,8 @@ static HRESULT WINAPI IMILBitmapScaler_QueryInterface(IMILBitmapScaler *iface, R
     void **ppv)
 {
     BitmapScaler *This = impl_from_IMILBitmapScaler(iface);
-
     TRACE("(%p,%s,%p)\n", iface, debugstr_guid(iid), ppv);
-
-    if (!ppv) return E_INVALIDARG;
-
-    if (IsEqualIID(&IID_IUnknown, iid) ||
-        IsEqualIID(&IID_IMILBitmapScaler, iid) ||
-        IsEqualIID(&IID_IMILBitmapSource, iid))
-    {
-        IUnknown_AddRef(&This->IMILBitmapScaler_iface);
-        *ppv = &This->IMILBitmapScaler_iface;
-        return S_OK;
-    }
-    else if (IsEqualIID(&IID_IWICBitmapScaler, iid) ||
-             IsEqualIID(&IID_IWICBitmapSource, iid))
-    {
-        IUnknown_AddRef(&This->IWICBitmapScaler_iface);
-        *ppv = &This->IWICBitmapScaler_iface;
-        return S_OK;
-    }
-
-    FIXME("unknown interface %s\n", debugstr_guid(iid));
-    *ppv = NULL;
-    return E_NOINTERFACE;
+    return IWICBitmapScaler_QueryInterface(&This->IWICBitmapScaler_iface, iid, ppv);
 }
 
 static ULONG WINAPI IMILBitmapScaler_AddRef(IMILBitmapScaler *iface)
@@ -431,12 +416,7 @@ static HRESULT WINAPI IMILBitmapScaler_GetSize(IMILBitmapScaler *iface,
     UINT *width, UINT *height)
 {
     BitmapScaler *This = impl_from_IMILBitmapScaler(iface);
-
     TRACE("(%p,%p,%p)\n", iface, width, height);
-
-    if (!This->source)
-        return WINCODEC_ERR_NOTINITIALIZED;
-
     return IWICBitmapScaler_GetSize(&This->IWICBitmapScaler_iface, width, height);
 }
 
@@ -467,12 +447,7 @@ static HRESULT WINAPI IMILBitmapScaler_GetResolution(IMILBitmapScaler *iface,
     double *dpix, double *dpiy)
 {
     BitmapScaler *This = impl_from_IMILBitmapScaler(iface);
-
     TRACE("(%p,%p,%p)\n", iface, dpix, dpiy);
-
-    if (!This->source)
-        return WINCODEC_ERR_NOTINITIALIZED;
-
     return IWICBitmapScaler_GetResolution(&This->IWICBitmapScaler_iface, dpix, dpiy);
 }
 
@@ -493,12 +468,7 @@ static HRESULT WINAPI IMILBitmapScaler_CopyPixels(IMILBitmapScaler *iface,
     const WICRect *rc, UINT stride, UINT size, BYTE *buffer)
 {
     BitmapScaler *This = impl_from_IMILBitmapScaler(iface);
-
     TRACE("(%p,%p,%u,%u,%p)\n", iface, rc, stride, size, buffer);
-
-    if (!This->source)
-        return WINCODEC_ERR_NOTINITIALIZED;
-
     return IWICBitmapScaler_CopyPixels(&This->IWICBitmapScaler_iface, rc, stride, size, buffer);
 }
 

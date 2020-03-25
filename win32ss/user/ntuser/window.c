@@ -1615,7 +1615,8 @@ PWND FASTCALL IntCreateWindow(CREATESTRUCTW* Cs,
                               PWND ParentWindow,
                               PWND OwnerWindow,
                               PVOID acbiBuffer,
-                              PDESKTOP pdeskCreated)
+                              PDESKTOP pdeskCreated,
+                              DWORD dwVer )
 {
    PWND pWnd = NULL;
    HWND hWnd;
@@ -1695,7 +1696,19 @@ PWND FASTCALL IntCreateWindow(CREATESTRUCTW* Cs,
    pWnd->spwndOwner = OwnerWindow;
    pWnd->fnid = 0;
    pWnd->spwndLastActive = pWnd;
-   pWnd->state2 |= WNDS2_WIN40COMPAT; // FIXME!!!
+   // Ramp up compatible version sets.
+   if ( dwVer >= WINVER_WIN31 )
+   {
+       pWnd->state2 |= WNDS2_WIN31COMPAT;
+       if ( dwVer >= WINVER_WINNT4 )
+       {
+           pWnd->state2 |= WNDS2_WIN40COMPAT;
+           if ( dwVer >= WINVER_WIN2K )
+           {
+               pWnd->state2 |= WNDS2_WIN50COMPAT;
+           }
+       }
+   }
    pWnd->pcls = Class;
    pWnd->hModule = Cs->hInstance;
    pWnd->style = Cs->style & ~WS_VISIBLE;
@@ -1956,7 +1969,8 @@ PWND FASTCALL
 co_UserCreateWindowEx(CREATESTRUCTW* Cs,
                      PUNICODE_STRING ClassName,
                      PLARGE_STRING WindowName,
-                     PVOID acbiBuffer)
+                     PVOID acbiBuffer,
+                     DWORD dwVer )
 {
    ULONG style;
    PWND Window = NULL, ParentWindow = NULL, OwnerWindow;
@@ -2017,6 +2031,16 @@ co_UserCreateWindowEx(CREATESTRUCTW* Cs,
          EngSetLastError(ERROR_TLW_WITH_WSCHILD);
          goto cleanup;  /* WS_CHILD needs a parent, but WS_POPUP doesn't */
     }
+    else if (Cs->lpszClass != (LPCWSTR)MAKEINTATOM(gpsi->atomSysClass[ICLS_DESKTOP]) &&
+             (IS_INTRESOURCE(Cs->lpszClass) ||
+              Cs->lpszClass != (LPCWSTR)MAKEINTATOM(gpsi->atomSysClass[ICLS_HWNDMESSAGE]) ||
+              _wcsicmp(Cs->lpszClass, L"Message") != 0))
+    {
+        if (pti->ppi->dwLayout & LAYOUT_RTL)
+        {
+            Cs->dwExStyle |= WS_EX_LAYOUTRTL;
+        }
+    }
 
     ParentWindow = hWndParent ? UserGetWindowObject(hWndParent): NULL;
     OwnerWindow = hWndOwner ? UserGetWindowObject(hWndOwner): NULL;
@@ -2063,7 +2087,8 @@ co_UserCreateWindowEx(CREATESTRUCTW* Cs,
                             ParentWindow,
                             OwnerWindow,
                             acbiBuffer,
-                            NULL);
+                            NULL,
+                            dwVer );
    if(!Window)
    {
        ERR("IntCreateWindow failed!\n");
@@ -2326,13 +2351,17 @@ co_UserCreateWindowEx(CREATESTRUCTW* Cs,
    IntSendParentNotify(Window, WM_CREATE);
 
    /* Notify the shell that a new window was created */
-   if (UserIsDesktopWindow(Window->spwndParent) &&
-       Window->spwndOwner == NULL &&
-       (Window->style & WS_VISIBLE) &&
-       (!(Window->ExStyle & WS_EX_TOOLWINDOW) ||
-        (Window->ExStyle & WS_EX_APPWINDOW)))
+   if (Window->spwndOwner == NULL ||
+       !(Window->spwndOwner->style & WS_VISIBLE) ||
+       (Window->spwndOwner->ExStyle & WS_EX_TOOLWINDOW))
    {
-      co_IntShellHookNotify(HSHELL_WINDOWCREATED, (WPARAM)hWnd, 0);
+      if (UserIsDesktopWindow(Window->spwndParent) &&
+          (Window->style & WS_VISIBLE) &&
+          (!(Window->ExStyle & WS_EX_TOOLWINDOW) ||
+           (Window->ExStyle & WS_EX_APPWINDOW)))
+      {
+         co_IntShellHookNotify(HSHELL_WINDOWCREATED, (WPARAM)hWnd, 0);
+      }
    }
 
    /* Initialize and show the window's scrollbars */
@@ -2588,7 +2617,7 @@ NtUserCreateWindowEx(
     UserEnterExclusive();
 
     /* Call the internal function */
-    pwnd = co_UserCreateWindowEx(&Cs, &ustrClsVersion, plstrWindowName, acbiBuffer);
+    pwnd = co_UserCreateWindowEx(&Cs, &ustrClsVersion, plstrWindowName, acbiBuffer, dwFlags);
 
     if(!pwnd)
     {
@@ -4028,7 +4057,7 @@ NtUserQueryWindow(HWND hWnd, DWORD Index)
          break;
 
       case QUERY_WINDOW_ISHUNG:
-         Result = (DWORD_PTR)MsqIsHung(pWnd->head.pti);
+         Result = (DWORD_PTR)MsqIsHung(pWnd->head.pti, MSQ_HUNG);
          break;
 
       case QUERY_WINDOW_REAL_ID:

@@ -33,9 +33,9 @@ static HMODULE hImageHlp;
 static BOOL (WINAPI *pImageGetDigestStream)(HANDLE, DWORD, DIGEST_FUNCTION, DIGEST_HANDLE);
 static BOOL (WINAPI *pBindImageEx)(DWORD Flags, const char *ImageName, const char *DllPath,
                                    const char *SymbolPath, PIMAGEHLP_STATUS_ROUTINE StatusRoutine);
-static DWORD (WINAPI* pGetImageUnusedHeaderBytes)(PLOADED_IMAGE, LPDWORD);
-static PLOADED_IMAGE (WINAPI* pImageLoad)(PCSTR, PCSTR);
-static BOOL (WINAPI* pImageUnload)(PLOADED_IMAGE);
+static DWORD (WINAPI *pGetImageUnusedHeaderBytes)(PLOADED_IMAGE, LPDWORD);
+static PLOADED_IMAGE (WINAPI *pImageLoad)(PCSTR, PCSTR);
+static BOOL (WINAPI *pImageUnload)(PLOADED_IMAGE);
 
 
 /* minimal PE file image */
@@ -229,7 +229,7 @@ static const struct expected_blob b1[] = {
     {FILE_TOTAL-FILE_IDATA-FIELD_OFFSET(struct Imports, ibn),
         &bin.idata_section.ibn}
 };
-static const struct expected_update_accum a1 = { sizeof(b1) / sizeof(b1[0]), b1, TRUE };
+static const struct expected_update_accum a1 = { ARRAY_SIZE(b1), b1, TRUE };
 
 static const struct expected_blob b2[] = {
     {FILE_PE_START,  &bin},
@@ -239,7 +239,7 @@ static const struct expected_blob b2[] = {
     {FILE_IDATA-FILE_TEXT, &bin.text_section},
     {FILE_TOTAL-FILE_IDATA, &bin.idata_section}
 };
-static const struct expected_update_accum a2 = { sizeof(b2) / sizeof(b2[0]), b2, FALSE };
+static const struct expected_update_accum a2 = { ARRAY_SIZE(b2), b2, FALSE };
 
 /* Creates a test file and returns a handle to it.  The file's path is returned
  * in temp_file, which must be at least MAX_PATH characters in length.
@@ -436,14 +436,9 @@ static void test_image_load(void)
     DWORD ret, count;
     HANDLE file;
 
-    if (!pImageLoad || !pImageUnload)
+    if (!pImageLoad || !pImageUnload || !pGetImageUnusedHeaderBytes)
     {
-        win_skip("ImageLoad or ImageUnload function is not available\n");
-        return;
-    }
-    if (!pGetImageUnusedHeaderBytes)
-    {
-        win_skip("GetImageUnusedHeaderBytes function is not available\n");
+        win_skip("ImageLoad functions are not available\n");
         return;
     }
 
@@ -496,11 +491,9 @@ static void test_image_load(void)
            "unexpected fSystemImage, got %d instead of 0\n", img->fSystemImage);
         ok(img->fDOSImage == 0,
            "unexpected fDOSImage, got %d instead of 0\n", img->fDOSImage);
-        todo_wine
-        ok(img->fReadOnly == 1 || broken(!img->fReadOnly) /* <= WinXP */,
+        todo_wine ok(img->fReadOnly == 1 || broken(!img->fReadOnly) /* <= WinXP */,
            "unexpected fReadOnly, got %d instead of 1\n", img->fReadOnly);
-        todo_wine
-        ok(img->Version == 1 || broken(!img->Version) /* <= WinXP */,
+        todo_wine ok(img->Version == 1 || broken(!img->Version) /* <= WinXP */,
            "unexpected Version, got %d instead of 1\n", img->Version);
         ok(img->SizeOfImage == 0x600,
            "unexpected SizeOfImage, got 0x%x instead of 0x600\n", img->SizeOfImage);

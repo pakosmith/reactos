@@ -256,6 +256,8 @@ DefWndDoSizeMove(PWND pwnd, WORD wParam)
    //PMONITOR mon = 0; Don't port sync from wine!!! This breaks explorer task bar sizing!!
    //                  The task bar can grow in size and can not reduce due to the change
    //                  in the work area.
+   DWORD ExStyleTB, StyleTB;
+   BOOL IsTaskBar;
 
    Style = pwnd->style;
    ExStyle = pwnd->ExStyle;
@@ -391,10 +393,78 @@ DefWndDoSizeMove(PWND pwnd, WORD wParam)
       if (!co_IntGetPeekMessage(&msg, 0, 0, 0, PM_REMOVE, TRUE)) break;
       if (IntCallMsgFilter( &msg, MSGF_SIZE )) continue;
 
-      /* Exit on button-up, Return, or Esc */
-      if ((msg.message == WM_LBUTTONUP) ||
-	  ((msg.message == WM_KEYDOWN) &&
-	   ((msg.wParam == VK_RETURN) || (msg.wParam == VK_ESCAPE)))) break;
+      /* Exit on button-up */
+      if (msg.message == WM_LBUTTONUP)
+      {
+         /* Test for typical TaskBar ExStyle Values */
+         ExStyleTB = (ExStyle & WS_EX_TOOLWINDOW);
+         TRACE("ExStyle is '%x'.\n", ExStyleTB);
+
+         /* Test for typical TaskBar Style Values */
+         StyleTB = (Style & (WS_POPUP | WS_VISIBLE |
+                        WS_CLIPSIBLINGS | WS_CLIPCHILDREN));
+         TRACE("Style is '%x'.\n", StyleTB);
+
+         /* Test for masked typical TaskBar Style and ExStyles to detect TaskBar */
+         IsTaskBar = (StyleTB == (WS_POPUP | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN))
+                     && (ExStyleTB == WS_EX_TOOLWINDOW);
+         TRACE("This %s the TaskBar.\n", IsTaskBar ? "is" : "is not");
+
+         // check for snapping if was moved by caption
+         if (hittest == HTCAPTION && thickframe && (ExStyle & WS_EX_MDICHILD) == 0)
+         {
+            RECT snapRect;
+            BOOL doSideSnap = FALSE;
+            UserSystemParametersInfo(SPI_GETWORKAREA, 0, &snapRect, 0);
+
+            /* if this is the taskbar, then we want to just exit */
+            if (IsTaskBar)
+            {
+               break;
+            }
+            // snap to left
+            if (pt.x <= snapRect.left)
+            {
+               snapRect.right = (snapRect.right - snapRect.left) / 2 + snapRect.left;
+               doSideSnap = TRUE;
+            }
+            // snap to right
+            if (pt.x >= snapRect.right-1)
+            {
+               snapRect.left = (snapRect.right - snapRect.left) / 2 + snapRect.left;
+               doSideSnap = TRUE;
+            }
+            
+            if (doSideSnap)
+            {
+               co_WinPosSetWindowPos(pwnd,
+                                     0,
+                                     snapRect.left,
+                                     snapRect.top,
+                                     snapRect.right - snapRect.left,
+                                     snapRect.bottom - snapRect.top,
+                                     0);
+               pwnd->InternalPos.NormalRect = origRect;
+            }
+            else
+            {
+               // maximize if on dragged to top
+               if (pt.y <= snapRect.top)
+               {
+                  co_IntSendMessage(UserHMGetHandle(pwnd), WM_SYSCOMMAND, SC_MAXIMIZE, 0);
+                  pwnd->InternalPos.NormalRect = origRect;
+               }
+            }
+         }
+         break;
+      }
+      
+      /* Exit on Return or Esc */
+      if (msg.message == WM_KEYDOWN &&
+          (msg.wParam == VK_RETURN || msg.wParam == VK_ESCAPE))
+      {
+         break;
+      }
 
       if ((msg.message != WM_KEYDOWN) && (msg.message != WM_MOUSEMOVE))
       {
@@ -1148,11 +1218,13 @@ NC_DoNCPaint(PWND pWnd, HDC hDC, INT Flags)
         FillRect(hDC, &TempRect, IntGetSysColorBrush(COLOR_BTNFACE));
 
         if (Parent)
+        {
            IntGetClientRect(Parent, &ParentClientRect);
 
-        if (HASSIZEGRIP(Style, ExStyle, Parent->style, WindowRect, ParentClientRect))
-        {
-           DrawFrameControl(hDC, &TempRect, DFC_SCROLL, DFCS_SCROLLSIZEGRIP);
+           if (HASSIZEGRIP(Style, ExStyle, Parent->style, WindowRect, ParentClientRect))
+           {
+              DrawFrameControl(hDC, &TempRect, DFC_SCROLL, DFCS_SCROLLSIZEGRIP);
+           }
         }
 
         IntDrawScrollBar(pWnd, hDC, SB_VERT);
@@ -1561,6 +1633,25 @@ NC_HandleNCLButtonDblClk(PWND pWnd, WPARAM wParam, LPARAM lParam)
           break;
 
       co_IntSendMessage(UserHMGetHandle(pWnd), WM_SYSCOMMAND, SC_CLOSE, lParam);
+      break;
+    }
+    case HTTOP:
+    case HTBOTTOM:
+    {
+      RECT sizingRect = pWnd->rcWindow, mouseRect;
+      
+      if (pWnd->ExStyle & WS_EX_MDICHILD)
+          break;
+      
+      UserSystemParametersInfo(SPI_GETWORKAREA, 0, &mouseRect, 0);
+        
+      co_WinPosSetWindowPos(pWnd,
+                            0,
+                            sizingRect.left,
+                            mouseRect.top,
+                            sizingRect.right - sizingRect.left,
+                            mouseRect.bottom - mouseRect.top,
+                            0);
       break;
     }
     default:

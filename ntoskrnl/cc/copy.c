@@ -178,7 +178,6 @@ CcWriteVirtualAddress (
         } while (++i < (Size >> PAGE_SHIFT));
     }
 
-    Size = ROUND_TO_PAGES(Size);
     ASSERT(Size <= VACB_MAPPING_GRANULARITY);
     ASSERT(Size > 0);
 
@@ -685,8 +684,7 @@ CcCanIWrite (
         Length = BytesToWrite;
     }
 
-    /* Convert it to pages count */
-    Pages = (Length + PAGE_SIZE - 1) >> PAGE_SHIFT;
+    Pages = BYTES_TO_PAGES(Length);
 
     /* By default, assume limits per file won't be hit */
     PerFileDefer = FALSE;

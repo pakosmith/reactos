@@ -23,7 +23,6 @@
 #include <shellapi.h>
 #include <htiframe.h>
 #include <strsafe.h>
-#include <undocshell.h>
 
 extern HRESULT IUnknown_ShowDW(IUnknown * punk, BOOL fShow);
 
@@ -323,7 +322,7 @@ public:
 
     CShellBrowser();
     ~CShellBrowser();
-    HRESULT Initialize(LPITEMIDLIST pidl, DWORD dwFlags);
+    HRESULT Initialize();
 public:
     HRESULT BrowseToPIDL(LPCITEMIDLIST pidl, long flags);
     HRESULT BrowseToPath(IShellFolder *newShellFolder, LPCITEMIDLIST absolutePIDL,
@@ -723,7 +722,7 @@ CShellBrowser::~CShellBrowser()
         DSA_Destroy(menuDsa);
 }
 
-HRESULT CShellBrowser::Initialize(LPITEMIDLIST pidl, DWORD dwFlags)
+HRESULT CShellBrowser::Initialize()
 {
     CComPtr<IPersistStreamInit>             persistStreamInit;
     HRESULT                                 hResult;
@@ -792,15 +791,8 @@ HRESULT CShellBrowser::Initialize(LPITEMIDLIST pidl, DWORD dwFlags)
     fStatusBarVisible = true;
 
 
-    // browse 
-    hResult = BrowseToPIDL(pidl, BTP_UPDATE_NEXT_HISTORY);
-    if (FAILED_UNEXPECTEDLY(hResult))
-        return hResult;
-
-    if ((dwFlags & SBSP_EXPLOREMODE) != NULL)
-        ShowBand(CLSID_ExplorerBand, true);
-
     ShowWindow(SW_SHOWNORMAL);
+    UpdateWindow();
 
     return S_OK;
 }
@@ -1008,6 +1000,11 @@ HRESULT CShellBrowser::BrowseToPath(IShellFolder *newShellFolder,
     if (saveCurrentShellView != NULL)
         saveCurrentShellView->DestroyViewWindow();
     fCurrentShellViewWindow = newShellViewWindow;
+
+    if (previousView == NULL)
+    {
+        RepositionBars();
+    }
 
     // no use
     saveCurrentShellView.Release();
@@ -1236,6 +1233,13 @@ HRESULT CShellBrowser::ShowBand(const CLSID &classID, bool vertical)
             if (FAILED_UNEXPECTEDLY(hResult))
                 return hResult;
         }
+        else if (IsEqualCLSID(classID, CLSID_FileSearchBand))
+        {
+            TRACE("CLSID_FileSearchBand requested, building internal band.\n");
+            hResult = CSearchBar_CreateInstance(IID_PPV_ARG(IUnknown, &newBand));
+            if (FAILED_UNEXPECTEDLY(hResult))
+                return hResult;
+        }
         else
         {
             TRACE("A different CLSID requested, using CoCreateInstance.\n");
@@ -1363,11 +1367,12 @@ HRESULT CShellBrowser::DoFolderOptions()
 #endif
 
     // show sheet
+    CStringW strFolderOptions(MAKEINTRESOURCEW(IDS_FOLDER_OPTIONS));
     m_PropSheet.dwSize = sizeof(PROPSHEETHEADER);
     m_PropSheet.dwFlags = 0;
     m_PropSheet.hwndParent = m_hWnd;
     m_PropSheet.hInstance = _AtlBaseModule.GetResourceInstance();
-    m_PropSheet.pszCaption = _T("Folder Options");
+    m_PropSheet.pszCaption = strFolderOptions;
     m_PropSheet.nStartPage = 0;
     PropertySheet(&m_PropSheet);
     return S_OK;
@@ -2011,25 +2016,12 @@ HRESULT STDMETHODCALLTYPE CShellBrowser::Exec(const GUID *pguidCmdGroup, DWORD n
         switch (nCmdID)
         {
             case 0x1c: //Toggle Search
-                if (IsEqualCLSID(CLSID_SH_SearchBand, fCurrentVertBar) ||
-                    IsEqualCLSID(CLSID_SearchBand, fCurrentVertBar) ||
-                    IsEqualCLSID(CLSID_IE_SearchBand, fCurrentVertBar) ||
-                    IsEqualCLSID(CLSID_FileSearchBand, fCurrentVertBar))
-                {
-                    hResult = IUnknown_ShowDW(fClientBars[BIVerticalBaseBar].clientBar.p, FALSE);
-                    memset(&fCurrentVertBar, 0, sizeof(fCurrentVertBar));
-                    FireCommandStateChangeAll();
-                }
-                else
-                {
-                    OnSearch();
-                }
-                return S_OK;
             case 0x1d: //Toggle History
             case 0x1e: //Toggle Favorites
             case 0x23: //Toggle Folders
                 const GUID* pclsid;
-                if (nCmdID == 0x1d) pclsid = &CLSID_SH_HistBand;
+                if (nCmdID == 0x1c) pclsid = &CLSID_FileSearchBand;
+                else if (nCmdID == 0x1d) pclsid = &CLSID_SH_HistBand;
                 else if (nCmdID == 0x1e) pclsid = &CLSID_SH_FavBand;
                 else pclsid = &CLSID_ExplorerBand;
 
@@ -2252,7 +2244,10 @@ HRESULT STDMETHODCALLTYPE CShellBrowser::BrowseObject(LPCITEMIDLIST pidl, UINT w
     if ((wFlags & SBSP_EXPLOREMODE) != NULL)
         ShowBand(CLSID_ExplorerBand, true);
 
-    return BrowseToPIDL(pidl, BTP_UPDATE_CUR_HISTORY | BTP_UPDATE_NEXT_HISTORY);
+    long flags = BTP_UPDATE_NEXT_HISTORY;
+    if (fTravelLog)
+        flags |= BTP_UPDATE_CUR_HISTORY;
+    return BrowseToPIDL(pidl, flags);
 }
 
 HRESULT STDMETHODCALLTYPE CShellBrowser::GetViewStateStream(DWORD grfMode, IStream **ppStrm)
@@ -3534,7 +3529,6 @@ LRESULT CShellBrowser::OnInitMenuPopup(UINT uMsg, WPARAM wParam, LPARAM lParam, 
     {
         // FIXME: Remove once implemented
         SHEnableMenuItem(theMenu, IDM_TOOLS_MAPNETWORKDRIVE, FALSE);
-        SHEnableMenuItem(theMenu, IDM_TOOLS_DISCONNECTNETWORKDRIVE, FALSE);
         SHEnableMenuItem(theMenu, IDM_TOOLS_SYNCHRONIZE, FALSE);
         menuIndex = 4;
     }
@@ -3563,9 +3557,6 @@ LRESULT CShellBrowser::RelayMsgToShellView(UINT uMsg, WPARAM wParam, LPARAM lPar
 
 LRESULT CShellBrowser::OnSettingChange(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandled)
 {
-    LPVOID lpEnvironment;
-    RegenerateUserEnvironment(&lpEnvironment, TRUE);
-
     SHPropagateMessage(m_hWnd, uMsg, wParam, lParam, TRUE);
     return 0;
 }
@@ -3593,15 +3584,13 @@ LRESULT CShellBrowser::OnMapNetworkDrive(WORD wNotifyCode, WORD wID, HWND hWndCt
 
 LRESULT CShellBrowser::OnDisconnectNetworkDrive(WORD wNotifyCode, WORD wID, HWND hWndCtl, BOOL &bHandled)
 {
-#ifndef __REACTOS__
     WNetDisconnectDialog(m_hWnd, RESOURCETYPE_DISK);
-#endif /* __REACTOS__ */
     return 0;
 }
 
 LRESULT CShellBrowser::OnAboutReactOS(WORD wNotifyCode, WORD wID, HWND hWndCtl, BOOL &bHandled)
 {
-    ShellAbout(m_hWnd, _T("ReactOS"), _T(""), NULL);
+    ShellAbout(m_hWnd, _T("ReactOS"), NULL, NULL);
     return 0;
 }
 
@@ -3757,7 +3746,7 @@ LRESULT CShellBrowser::OnExplorerBar(WORD wNotifyCode, WORD wID, HWND hWndCtl, B
     switch (wID)
     {
     case IDM_EXPLORERBAR_SEARCH:
-        Exec(&CLSID_CommonButtons, 0x123, 1, NULL, NULL);
+        ShowBand(CLSID_FileSearchBand, true);
         break;
     case IDM_EXPLORERBAR_FOLDERS:
         ShowBand(CLSID_ExplorerBand, true);
@@ -3782,7 +3771,7 @@ LRESULT CShellBrowser::RelayCommands(UINT uMsg, WPARAM wParam, LPARAM lParam, BO
     return 0;
 }
 
-HRESULT CShellBrowser_CreateInstance(LPITEMIDLIST pidl, DWORD dwFlags, REFIID riid, void **ppv)
+HRESULT CShellBrowser_CreateInstance(REFIID riid, void **ppv)
 {
-    return ShellObjectCreatorInit<CShellBrowser>(pidl, dwFlags, riid, ppv);
+    return ShellObjectCreatorInit<CShellBrowser>(riid, ppv);
 }

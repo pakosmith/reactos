@@ -32,6 +32,7 @@
 #include "urlmon.h"
 #include "wininet.h"
 #include "mshtml.h"
+#include "shlwapi.h"
 
 #include "wine/test.h"
 
@@ -1929,8 +1930,8 @@ static HRESULT WINAPI statusclb_OnStopBinding(IBindStatusCallbackEx *iface, HRES
     }
 
     if(test_protocol == HTTP_TEST && !emulate_protocol && http_cache_file[0]) {
-        HANDLE file = CreateFileW(http_cache_file, DELETE, FILE_SHARE_DELETE, NULL,
-                                  OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        HANDLE file = CreateFileW(http_cache_file, DELETE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                  NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
         ok(file == INVALID_HANDLE_VALUE, "expected INVALID_HANDLE_VALUE, got %p\n", file);
         ok(GetLastError() == ERROR_SHARING_VIOLATION, "expected ERROR_SHARING_VIOLATION, got %u\n", GetLastError());
         http_cache_file[0] = 0;
@@ -2905,14 +2906,14 @@ static void init_bind_test(int protocol, DWORD flags, DWORD t)
         url_a = (flags & BINDTEST_INVALID_CN) ? "https://4.15.184.77/favicon.ico" : "https://test.winehq.org/tests/hello.html";
         break;
     case FTP_TEST:
-        url_a = "ftp://ftp.winehq.org/welcome.msg";
+        url_a = "ftp://ftp.winehq.org/welcome%2emsg";
         break;
     default:
         url_a = "winetest:test";
     }
 
     if(url_a)
-        MultiByteToWideChar(CP_ACP, 0, url_a, -1, current_url, sizeof(current_url)/sizeof(*current_url));
+        MultiByteToWideChar(CP_ACP, 0, url_a, -1, current_url, ARRAY_SIZE(current_url));
 
     test_redirect = (flags & BINDTEST_REDIRECT) != 0;
     use_cache_file = (flags & BINDTEST_USE_CACHE) != 0;
@@ -2968,6 +2969,13 @@ static void test_BindToStorage(int protocol, DWORD flags, DWORD t)
     ok(hres == S_OK, "failed to create moniker: %08x\n", hres);
     if(FAILED(hres))
         return;
+
+    if(protocol == FTP_TEST)
+    {
+        /* FTP urls don't have any escape characters so convert the url to what is expected */
+        DWORD size = 0;
+        UrlUnescapeW(current_url, NULL, &size, URL_UNESCAPE_INPLACE);
+    }
 
     hres = IMoniker_QueryInterface(mon, &IID_IBinding, (void**)&bind);
     ok(hres == E_NOINTERFACE, "IMoniker should not have IBinding interface\n");

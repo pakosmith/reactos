@@ -159,6 +159,7 @@ typedef struct _OB_TEMP_BUFFER
 //
 // Startup and Shutdown Functions
 //
+INIT_FUNCTION
 BOOLEAN
 NTAPI
 ObInitSystem(
@@ -291,11 +292,12 @@ ObpSetHandleAttributes(
     IN ULONG_PTR Context
 );
 
-VOID
+NTSTATUS
 NTAPI
 ObQueryDeviceMapInformation(
     IN PEPROCESS Process,
-    OUT PPROCESS_DEVICEMAP_INFORMATION DeviceMapInfo
+    OUT PPROCESS_DEVICEMAP_INFORMATION DeviceMapInfo,
+    IN ULONG Flags
 );
 
 //
@@ -398,8 +400,15 @@ ObReferenceFileObjectForWrite(
 //
 NTSTATUS
 NTAPI
-ObpCreateDeviceMap(
+ObSetDeviceMap(
+    IN PEPROCESS Process,
     IN HANDLE DirectoryHandle
+);
+
+NTSTATUS
+NTAPI
+ObSetDirectoryDeviceMap(OUT PDEVICE_MAP * DeviceMap,
+                        IN HANDLE DirectoryHandle
 );
 
 VOID
@@ -421,15 +430,29 @@ ObInheritDeviceMap(
     IN PEPROCESS Process
 );
 
+INIT_FUNCTION
 NTSTATUS
 NTAPI
 ObpCreateDosDevicesDirectory(
     VOID
 );
 
+ULONG
+NTAPI
+ObIsLUIDDeviceMapsEnabled(
+    VOID
+);
+
+PDEVICE_MAP
+NTAPI
+ObpReferenceDeviceMap(
+    VOID
+);
+
 //
 // Security descriptor cache functions
 //
+INIT_FUNCTION
 NTSTATUS
 NTAPI
 ObpInitSdCache(
@@ -615,6 +638,10 @@ extern ALIGNEDNAME ObpDosDevicesShortNameRoot;
 extern UNICODE_STRING ObpDosDevicesShortName;
 extern WCHAR ObpUnsecureGlobalNamesBuffer[128];
 extern ULONG ObpUnsecureGlobalNamesLength;
+extern ULONG ObpObjectSecurityMode;
+extern ULONG ObpProtectionMode;
+extern ULONG ObpLUIDDeviceMapsDisabled;
+extern ULONG ObpLUIDDeviceMapsEnabled;
 
 //
 // Inlined Functions

@@ -61,6 +61,7 @@ typedef struct
     HWND    hListWnd;
     HWND    hAddressBarWnd;
     HWND    hAddressBtnWnd;
+    HICON   hArrowIcon;
     int     nFocusPanel;      /* 0: left  1: right */
     int     nSplitPos;
     WINDOWPLACEMENT pos;
@@ -109,7 +110,7 @@ extern BOOL CopyKeyName(HWND hWnd, HKEY hRootKey, LPCWSTR keyName);
 extern BOOL ExportRegistryFile(HWND hWnd);
 
 /* listview.c */
-extern HWND CreateListView(HWND hwndParent, HMENU id);
+extern HWND CreateListView(HWND hwndParent, HMENU id, INT cx);
 extern BOOL RefreshListView(HWND hwndLV, HKEY hKey, LPCWSTR keyPath);
 extern LPCWSTR GetValueName(HWND hwndLV, int iStartAt);
 extern BOOL ListWndNotifyProc(HWND hWnd, WPARAM wParam, LPARAM lParam, BOOL *Result);

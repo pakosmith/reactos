@@ -20,8 +20,9 @@ INT cmdStop(INT argc, WCHAR **argv)
 
     if (argc != 3)
     {
-        ConResPuts(StdOut, IDS_GENERIC_SYNTAX);
-        ConResPuts(StdOut, IDS_STOP_SYNTAX);
+        PrintMessageString(4381);
+        ConPuts(StdOut, L"\n");
+        PrintNetMessage(MSG_STOP_SYNTAX);
         return 1;
     }
 
@@ -29,11 +30,10 @@ INT cmdStop(INT argc, WCHAR **argv)
     {
         if (_wcsicmp(argv[i], L"/help") == 0)
         {
-            ConResPuts(StdOut, IDS_GENERIC_SYNTAX);
-            ConResPuts(StdOut, IDS_STOP_SYNTAX);
-            ConResPuts(StdOut, IDS_STOP_HELP_1);
-            ConResPuts(StdOut, IDS_STOP_HELP_2);
-            ConResPuts(StdOut, IDS_STOP_HELP_3);
+            PrintMessageString(4381);
+            ConPuts(StdOut, L"\n");
+            PrintNetMessage(MSG_STOP_SYNTAX);
+            PrintNetMessage(MSG_STOP_HELP);
             return 1;
         }
     }

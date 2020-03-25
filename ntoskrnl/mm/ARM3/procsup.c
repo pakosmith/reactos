@@ -405,7 +405,6 @@ MmGrowKernelStackEx(IN PVOID StackPointer,
         //
         // Sorry!
         //
-        DPRINT1("Thread wants too much stack\n");
         return STATUS_STACK_OVERFLOW;
     }
 
@@ -1028,9 +1027,9 @@ MmInitializeProcessAddressSpace(IN PEPROCESS Process,
     return Status;
 }
 
+INIT_FUNCTION
 NTSTATUS
 NTAPI
-INIT_FUNCTION
 MmInitializeHandBuiltProcess(IN PEPROCESS Process,
                              IN PULONG_PTR DirectoryTableBase)
 {
@@ -1053,9 +1052,9 @@ MmInitializeHandBuiltProcess(IN PEPROCESS Process,
     return STATUS_SUCCESS;
 }
 
+INIT_FUNCTION
 NTSTATUS
 NTAPI
-INIT_FUNCTION
 MmInitializeHandBuiltProcess2(IN PEPROCESS Process)
 {
     /* Lock the VAD, ARM3-owned ranges away */

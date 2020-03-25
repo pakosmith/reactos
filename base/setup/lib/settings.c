@@ -433,16 +433,18 @@ DefaultProcessEntry(
 }
 
 
-PGENERIC_LIST
-CreateComputerTypeList(
-    IN HINF InfFile)
+BOOLEAN
+AddComputerTypeEntries(
+    _In_ HINF InfFile,
+    PGENERIC_LIST List,
+    _In_ PWSTR SectionName)
 {
-    PGENERIC_LIST List;
     INFCONTEXT Context;
     PCWSTR KeyName;
     PCWSTR KeyValue;
     WCHAR ComputerIdentifier[128];
     WCHAR ComputerKey[32];
+    ULONG Count1, Count2;
 
     /* Get the computer identification */
     if (!GetComputerIdentifier(ComputerIdentifier, 128))
@@ -453,10 +455,10 @@ CreateComputerTypeList(
     DPRINT("Computer identifier: '%S'\n", ComputerIdentifier);
 
     /* Search for matching device identifier */
-    if (!SpInfFindFirstLine(InfFile, L"Map.Computer", NULL, &Context))
+    if (!SpInfFindFirstLine(InfFile, SectionName, NULL, &Context))
     {
         /* FIXME: error message */
-        return NULL;
+        return FALSE;
     }
 
     do
@@ -467,7 +469,7 @@ CreateComputerTypeList(
         {
             /* FIXME: Handle error! */
             DPRINT("INF_GetDataField() failed\n");
-            return NULL;
+            return FALSE;
         }
 
         DPRINT("KeyValue: %S\n", KeyValue);
@@ -481,7 +483,7 @@ CreateComputerTypeList(
         {
             /* FIXME: Handle error! */
             DPRINT("INF_GetDataField() failed\n");
-            return NULL;
+            return FALSE;
         }
 
         DPRINT("Computer key: %S\n", KeyName);
@@ -489,16 +491,40 @@ CreateComputerTypeList(
         INF_FreeData(KeyName);
     } while (SpInfFindNextLine(&Context, &Context));
 
+    Count1 = AddEntriesFromInfSection(List,
+                                      InfFile,
+                                      L"Computer",
+                                      &Context,
+                                      DefaultProcessEntry,
+                                      ComputerKey);
+    Count2 = AddEntriesFromInfSection(List,
+                                      InfFile,
+                                      L"Computer.NT" INF_ARCH,
+                                      &Context,
+                                      DefaultProcessEntry,
+                                      ComputerKey);
+    if ((Count1 == -1) && (Count2 == -1))
+    {
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+PGENERIC_LIST
+CreateComputerTypeList(
+    IN HINF InfFile)
+{
+    PGENERIC_LIST List;
+    BOOLEAN Success;
+
     List = CreateGenericList();
     if (List == NULL)
         return NULL;
 
-    if (AddEntriesFromInfSection(List,
-                                 InfFile,
-                                 L"Computer",
-                                 &Context,
-                                 DefaultProcessEntry,
-                                 ComputerKey) == -1)
+    Success = AddComputerTypeEntries(InfFile, List, L"Map.Computer");
+    Success |= AddComputerTypeEntries(InfFile, List, L"Map.Computer.NT" INF_ARCH);
+    if (!Success)
     {
         DestroyGenericList(List, TRUE);
         return NULL;
@@ -809,7 +835,7 @@ ProcessDisplayRegistry(
     }
 
     ASSERT(wcslen(ServiceName) < 10);
-    DPRINT1("Service name: '%S'\n", ServiceName);
+    DPRINT("Service name: '%S'\n", ServiceName);
 
     RtlStringCchPrintfW(RegPath, ARRAYSIZE(RegPath),
                         L"System\\CurrentControlSet\\Services\\%s",
@@ -853,7 +879,7 @@ ProcessDisplayRegistry(
     RtlStringCchPrintfW(RegPath, ARRAYSIZE(RegPath),
                         L"System\\CurrentControlSet\\Hardware Profiles\\Current\\System\\CurrentControlSet\\Services\\%s\\Device0",
                         ServiceName);
-    DPRINT1("RegPath: '%S'\n", RegPath);
+    DPRINT("RegPath: '%S'\n", RegPath);
     RtlInitUnicodeString(&KeyName, RegPath);
     InitializeObjectAttributes(&ObjectAttributes,
                                &KeyName,

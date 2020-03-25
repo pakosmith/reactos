@@ -25,6 +25,7 @@ UNICODE_STRING ImageExecOptionsString = RTL_CONSTANT_STRING(L"\\Registry\\Machin
 UNICODE_STRING Wow64OptionsString = RTL_CONSTANT_STRING(L"");
 UNICODE_STRING NtDllString = RTL_CONSTANT_STRING(L"ntdll.dll");
 UNICODE_STRING Kernel32String = RTL_CONSTANT_STRING(L"kernel32.dll");
+const UNICODE_STRING LdrpDotLocal = RTL_CONSTANT_STRING(L".Local");
 
 BOOLEAN LdrpInLdrInit;
 LONG LdrpProcessInitialized;
@@ -55,6 +56,7 @@ ULONG LdrpNumberOfProcessors;
 PVOID NtDllBase;
 extern LARGE_INTEGER RtlpTimeout;
 BOOLEAN RtlpTimeoutDisable;
+PVOID LdrpHeap;
 LIST_ENTRY LdrpHashTable[LDR_HASH_TABLE_ENTRIES];
 LIST_ENTRY LdrpDllNotificationList;
 HANDLE LdrpKnownDllObjectDirectory;
@@ -91,7 +93,7 @@ ULONG RtlpDisableHeapLookaside; // TODO: Move to heap.c
 ULONG RtlpShutdownProcessFlags; // TODO: Use it
 
 NTSTATUS LdrPerformRelocations(PIMAGE_NT_HEADERS NTHeaders, PVOID ImageBase);
-void actctx_init(void);
+void actctx_init(PVOID* pOldShimData);
 extern BOOLEAN RtlpUse16ByteSLists;
 
 #ifdef _WIN64
@@ -663,7 +665,7 @@ LdrpRunInitializeRoutines(IN PCONTEXT Context OPTIONAL)
         if (Count > 16)
         {
             /* Allocate space for all the entries */
-            LdrRootEntry = RtlAllocateHeap(RtlGetProcessHeap(),
+            LdrRootEntry = RtlAllocateHeap(LdrpHeap,
                                            0,
                                            Count * sizeof(*LdrRootEntry));
             if (!LdrRootEntry) return STATUS_NO_MEMORY;
@@ -921,7 +923,7 @@ Quickie:
     if (LdrRootEntry != LocalArray)
     {
         /* Free the array */
-        RtlFreeHeap(RtlGetProcessHeap(), 0, LdrRootEntry);
+        RtlFreeHeap(LdrpHeap, 0, LdrRootEntry);
     }
 
     /* Return to caller */
@@ -1535,13 +1537,55 @@ LdrpValidateImageForMp(IN PLDR_DATA_TABLE_ENTRY LdrDataTableEntry)
     UNIMPLEMENTED;
 }
 
+BOOLEAN
+NTAPI
+LdrpDisableProcessCompatGuidDetection(VOID)
+{
+    UNICODE_STRING PolicyKey = RTL_CONSTANT_STRING(L"\\Registry\\MACHINE\\Software\\Policies\\Microsoft\\Windows\\AppCompat");
+    UNICODE_STRING DisableDetection = RTL_CONSTANT_STRING(L"DisableCompatGuidDetection");
+    OBJECT_ATTRIBUTES PolicyKeyAttributes = RTL_CONSTANT_OBJECT_ATTRIBUTES(&PolicyKey, OBJ_CASE_INSENSITIVE);
+    KEY_VALUE_PARTIAL_INFORMATION KeyInfo;
+    ULONG ResultLength;
+    NTSTATUS Status;
+    HANDLE KeyHandle;
+
+    Status = NtOpenKey(&KeyHandle, KEY_QUERY_VALUE, &PolicyKeyAttributes);
+    if (NT_SUCCESS(Status))
+    {
+        Status = NtQueryValueKey(KeyHandle,
+                                 &DisableDetection,
+                                 KeyValuePartialInformation,
+                                 &KeyInfo,
+                                 sizeof(KeyInfo),
+                                 &ResultLength);
+        NtClose(KeyHandle);
+        if ((NT_SUCCESS(Status)) &&
+            (KeyInfo.Type == REG_DWORD) &&
+            (KeyInfo.DataLength == sizeof(ULONG)) &&
+            (KeyInfo.Data[0] == TRUE))
+        {
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+
 VOID
 NTAPI
-LdrpInitializeProcessCompat(PVOID* pOldShimData)
+LdrpInitializeProcessCompat(PVOID pProcessActctx, PVOID* pOldShimData)
 {
-    static const GUID* GuidOrder[] = { &COMPAT_GUID_WIN10, &COMPAT_GUID_WIN81, &COMPAT_GUID_WIN8,
-                                       &COMPAT_GUID_WIN7, &COMPAT_GUID_VISTA };
-    static const DWORD GuidVersions[] = { WINVER_WIN10, WINVER_WIN81, WINVER_WIN8, WINVER_WIN7, WINVER_VISTA };
+    static const struct
+    {
+        const GUID* Guid;
+        const DWORD Version;
+    } KnownCompatGuids[] = {
+        { &COMPAT_GUID_WIN10, _WIN32_WINNT_WIN10 },
+        { &COMPAT_GUID_WIN81, _WIN32_WINNT_WINBLUE },
+        { &COMPAT_GUID_WIN8, _WIN32_WINNT_WIN8 },
+        { &COMPAT_GUID_WIN7, _WIN32_WINNT_WIN7 },
+        { &COMPAT_GUID_VISTA, _WIN32_WINNT_VISTA },
+    };
 
     ULONG Buffer[(sizeof(COMPATIBILITY_CONTEXT_ELEMENT) * 10 + sizeof(ACTIVATION_CONTEXT_COMPATIBILITY_INFORMATION)) / sizeof(ULONG)];
     ACTIVATION_CONTEXT_COMPATIBILITY_INFORMATION* ContextCompatInfo;
@@ -1549,8 +1593,6 @@ LdrpInitializeProcessCompat(PVOID* pOldShimData)
     NTSTATUS Status;
     DWORD n, cur;
     ReactOS_ShimData* pShimData = *pOldShimData;
-
-    C_ASSERT(RTL_NUMBER_OF(GuidOrder) == RTL_NUMBER_OF(GuidVersions));
 
     if (pShimData)
     {
@@ -1562,14 +1604,21 @@ LdrpInitializeProcessCompat(PVOID* pOldShimData)
         }
         if (pShimData->dwRosProcessCompatVersion)
         {
-            DPRINT1("LdrpInitializeProcessCompat: ProcessCompatVersion already set to 0x%x\n", pShimData->dwRosProcessCompatVersion);
+            if (pShimData->dwRosProcessCompatVersion == REACTOS_COMPATVERSION_IGNOREMANIFEST)
+            {
+                DPRINT1("LdrpInitializeProcessCompat: ProcessCompatVersion set to ignore manifest\n");
+            }
+            else
+            {
+                DPRINT1("LdrpInitializeProcessCompat: ProcessCompatVersion already set to 0x%x\n", pShimData->dwRosProcessCompatVersion);
+            }
             return;
         }
     }
 
     SizeRequired = sizeof(Buffer);
     Status = RtlQueryInformationActivationContext(RTL_QUERY_ACTIVATION_CONTEXT_FLAG_NO_ADDREF,
-                                                  NULL,
+                                                  pProcessActctx,
                                                   NULL,
                                                   CompatibilityInformationInActivationContext,
                                                   Buffer,
@@ -1588,13 +1637,19 @@ LdrpInitializeProcessCompat(PVOID* pOldShimData)
         return;
 
     /* Search for known GUID's, starting from newest to oldest. */
-    for (cur = 0; cur < RTL_NUMBER_OF(GuidOrder); ++cur)
+    for (cur = 0; cur < RTL_NUMBER_OF(KnownCompatGuids); ++cur)
     {
         for (n = 0; n < ContextCompatInfo->ElementCount; ++n)
         {
             if (ContextCompatInfo->Elements[n].Type == ACTCX_COMPATIBILITY_ELEMENT_TYPE_OS &&
-                RtlCompareMemory(&ContextCompatInfo->Elements[n].Id, GuidOrder[cur], sizeof(GUID)) == sizeof(GUID))
+                RtlCompareMemory(&ContextCompatInfo->Elements[n].Id, KnownCompatGuids[cur].Guid, sizeof(GUID)) == sizeof(GUID))
             {
+                if (LdrpDisableProcessCompatGuidDetection())
+                {
+                    DPRINT1("LdrpInitializeProcessCompat: Not applying automatic fix for winver 0x%x due to policy\n", KnownCompatGuids[cur].Version);
+                    return;
+                }
+
                 /* If this process did not need shim data before, allocate and store it */
                 if (pShimData == NULL)
                 {
@@ -1617,10 +1672,70 @@ LdrpInitializeProcessCompat(PVOID* pOldShimData)
                 }
 
                 /* Store the highest found version, and bail out. */
-                pShimData->dwRosProcessCompatVersion = GuidVersions[cur];
-                DPRINT1("LdrpInitializeProcessCompat: Found guid for winver 0x%x\n", GuidVersions[cur]);
+                pShimData->dwRosProcessCompatVersion = KnownCompatGuids[cur].Version;
+                DPRINT1("LdrpInitializeProcessCompat: Found guid for winver 0x%x\n", KnownCompatGuids[cur].Version);
                 return;
             }
+        }
+    }
+}
+
+VOID
+NTAPI
+LdrpInitializeDotLocalSupport(PRTL_USER_PROCESS_PARAMETERS ProcessParameters)
+{
+    UNICODE_STRING ImagePathName = ProcessParameters->ImagePathName;
+    WCHAR LocalBuffer[MAX_PATH];
+    UNICODE_STRING DotLocal;
+    NTSTATUS Status;
+    ULONG RequiredSize;
+
+    RequiredSize = ImagePathName.Length + LdrpDotLocal.Length + sizeof(UNICODE_NULL);
+    if (RequiredSize <= sizeof(LocalBuffer))
+    {
+        RtlInitEmptyUnicodeString(&DotLocal, LocalBuffer, sizeof(LocalBuffer));
+    }
+    else if (RequiredSize <= UNICODE_STRING_MAX_BYTES)
+    {
+        DotLocal.Buffer = RtlAllocateHeap(RtlGetProcessHeap(), 0, RequiredSize);
+        DotLocal.Length = 0;
+        DotLocal.MaximumLength = RequiredSize;
+        if (!DotLocal.Buffer)
+            DPRINT1("LDR: Failed to allocate memory for .local check\n");
+    }
+    else
+    {
+        DotLocal.Buffer = NULL;
+        DotLocal.Length = 0;
+        DotLocal.MaximumLength = 0;
+        DPRINT1("LDR: String too big for .local check\n");
+    }
+
+    if (DotLocal.Buffer)
+    {
+        Status = RtlAppendUnicodeStringToString(&DotLocal, &ImagePathName);
+        ASSERT(NT_SUCCESS(Status));
+        if (NT_SUCCESS(Status))
+        {
+            Status = RtlAppendUnicodeStringToString(&DotLocal, &LdrpDotLocal);
+            ASSERT(NT_SUCCESS(Status));
+        }
+
+        if (NT_SUCCESS(Status))
+        {
+            if (RtlDoesFileExists_UStr(&DotLocal))
+            {
+                ProcessParameters->Flags |= RTL_USER_PROCESS_PARAMETERS_PRIVATE_DLL_PATH;
+            }
+        }
+        else
+        {
+            DPRINT1("LDR: Failed to append: 0x%lx\n", Status);
+        }
+
+        if (DotLocal.Buffer != LocalBuffer)
+        {
+            RtlFreeHeap(RtlGetProcessHeap(), 0, DotLocal.Buffer);
         }
     }
 }
@@ -1752,9 +1867,9 @@ LdrpInitializeProcess(IN PCONTEXT Context,
                                               &ConfigSize);
 
     /* Setup the Heap Parameters */
-    RtlZeroMemory(&HeapParameters, sizeof(RTL_HEAP_PARAMETERS));
+    RtlZeroMemory(&HeapParameters, sizeof(HeapParameters));
     HeapFlags = HEAP_GROWABLE;
-    HeapParameters.Length = sizeof(RTL_HEAP_PARAMETERS);
+    HeapParameters.Length = sizeof(HeapParameters);
 
     /* Check if we have Configuration Data */
     if ((LoadConfig) && (ConfigSize == sizeof(IMAGE_LOAD_CONFIG_DIRECTORY)))
@@ -1875,8 +1990,15 @@ LdrpInitializeProcess(IN PCONTEXT Context,
     Status = RtlAllocateActivationContextStack(&Teb->ActivationContextStackPointer);
     if (!NT_SUCCESS(Status)) return Status;
 
-    // FIXME: Loader private heap is missing
-    //DPRINT1("Loader private heap is missing\n");
+    RtlZeroMemory(&HeapParameters, sizeof(HeapParameters));
+    HeapFlags = HEAP_GROWABLE | HEAP_CLASS_1;
+    HeapParameters.Length = sizeof(HeapParameters);
+    LdrpHeap = RtlCreateHeap(HeapFlags, 0, 0x10000, 0x6000, 0, &HeapParameters);
+    if (!LdrpHeap)
+    {
+        DPRINT1("Failed to create loader private heap\n");
+        return STATUS_NO_MEMORY;
+    }
 
     /* Check for Debug Heap */
     if (OptionsKey)
@@ -2105,10 +2227,7 @@ LdrpInitializeProcess(IN PCONTEXT Context,
                    &LdrpNtDllDataTableEntry->InInitializationOrderLinks);
 
     /* Initialize Wine's active context implementation for the current process */
-    actctx_init();
-
-    /* ReactOS specific */
-    LdrpInitializeProcessCompat(&OldShimData);
+    actctx_init(&OldShimData);
 
     /* Set the current directory */
     Status = RtlSetCurrentDirectory_U(&CurrentDirectory);
@@ -2128,10 +2247,9 @@ LdrpInitializeProcess(IN PCONTEXT Context,
     }
 
     /* Check if we should look for a .local file */
-    if (ProcessParameters->Flags & RTL_USER_PROCESS_PARAMETERS_LOCAL_DLL_PATH)
+    if (ProcessParameters && !(ProcessParameters->Flags & RTL_USER_PROCESS_PARAMETERS_LOCAL_DLL_PATH))
     {
-        /* FIXME */
-        DPRINT1("We don't support .local overrides yet\n");
+        LdrpInitializeDotLocalSupport(ProcessParameters);
     }
 
     /* Check if the Application Verifier was enabled */
@@ -2297,7 +2415,7 @@ LdrpInitializeProcess(IN PCONTEXT Context,
     {
         WCHAR szCSDVersion[128];
         LONG i;
-        ULONG Length = ARRAYSIZE(szCSDVersion) - 1;
+        USHORT Length = (USHORT)ARRAYSIZE(szCSDVersion) - 1;
         i = _snwprintf(szCSDVersion, Length,
                        L"Service Pack %d",
                        ((Peb->OSCSDVersion >> 8) & 0xFF));

@@ -19,8 +19,6 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#include "config.h"
-#include "wine/port.h"
 
 #include <stdio.h>
 #include <stdarg.h>
@@ -542,8 +540,8 @@ ULONG WINAPI MAPISendMail( LHANDLE session, ULONG_PTR uiparam,
     }
 
     /* Display an error message since we apparently have no mail clients */
-    LoadStringW(hInstMAPI32, IDS_NO_MAPI_CLIENT, error_msg, sizeof(error_msg) / sizeof(WCHAR));
-    LoadStringW(hInstMAPI32, IDS_SEND_MAIL, msg_title, sizeof(msg_title) / sizeof(WCHAR));
+    LoadStringW(hInstMAPI32, IDS_NO_MAPI_CLIENT, error_msg, ARRAY_SIZE(error_msg));
+    LoadStringW(hInstMAPI32, IDS_SEND_MAIL, msg_title, ARRAY_SIZE(msg_title));
 
     MessageBoxW((HWND) uiparam, error_msg, msg_title, MB_ICONEXCLAMATION);
 
@@ -701,8 +699,8 @@ ULONG WINAPI MAPISendMailW(LHANDLE session, ULONG_PTR uiparam,
     }
 
     /* Display an error message since we apparently have no mail clients */
-    LoadStringW(hInstMAPI32, IDS_NO_MAPI_CLIENT, error_msg, sizeof(error_msg) / sizeof(WCHAR));
-    LoadStringW(hInstMAPI32, IDS_SEND_MAIL, msg_title, sizeof(msg_title) / sizeof(WCHAR));
+    LoadStringW(hInstMAPI32, IDS_NO_MAPI_CLIENT, error_msg, ARRAY_SIZE(error_msg));
+    LoadStringW(hInstMAPI32, IDS_SEND_MAIL, msg_title, ARRAY_SIZE(msg_title));
 
     MessageBoxW((HWND) uiparam, error_msg, msg_title, MB_ICONEXCLAMATION);
 

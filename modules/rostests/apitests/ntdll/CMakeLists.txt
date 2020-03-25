@@ -15,6 +15,7 @@ list(APPEND SOURCE
     NtCreateKey.c
     NtCreateThread.c
     NtDeleteKey.c
+    NtDuplicateObject.c
     NtFreeVirtualMemory.c
     NtLoadUnloadKey.c
     NtMapViewOfSection.c
@@ -23,16 +24,22 @@ list(APPEND SOURCE
     NtOpenProcessToken.c
     NtOpenThreadToken.c
     NtProtectVirtualMemory.c
+    NtQueryInformationFile.c
     NtQueryInformationProcess.c
     NtQueryKey.c
     NtQuerySystemEnvironmentValue.c
+    NtQuerySystemInformation.c
     NtQueryVolumeInformationFile.c
     NtReadFile.c
     NtSaveKey.c
+    NtSetInformationFile.c
     NtSetValueKey.c
+    NtSetVolumeInformationFile.c
+    NtUnloadDriver.c
     NtWriteFile.c
     RtlAllocateHeap.c
     RtlBitmap.c
+    RtlComputePrivatizedDllName_U.c
     RtlCopyMappedMemory.c
     RtlDeleteAce.c
     RtlDetermineDosPathNameType.c
@@ -50,7 +57,6 @@ list(APPEND SOURCE
     RtlGetLongestNtPathLength.c
     RtlHandle.c
     RtlImageRvaToVa.c
-    RtlInitializeBitMap.c
     RtlIsNameLegalDOS8Dot3.c
     RtlMemoryStream.c
     RtlNtPathNameToDosPathName.c
@@ -59,6 +65,7 @@ list(APPEND SOURCE
     RtlReAllocateHeap.c
     RtlUnicodeStringToAnsiString.c
     RtlUpcaseUnicodeStringToCountedOemString.c
+    RtlValidateUnicodeString.c
     StackOverflow.c
     SystemInfo.c
     Timer.c
@@ -82,6 +89,9 @@ add_pch(ntdll_apitest precomp.h SOURCE)
 
 if(NOT MSVC)
     set_source_files_properties(RtlGetFullPathName_UstrEx.c PROPERTIES COMPILE_FLAGS "-Wno-format")
+
+    # Avoid "universal character names are only valid in C++ and C99" error.
+    set_property(TARGET ntdll_apitest PROPERTY C_STANDARD 99)
 endif()
 
 add_rostests_file(TARGET ntdll_apitest)

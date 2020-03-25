@@ -91,9 +91,9 @@ BOOLEAN ExpRealTimeIsUniversal;
 
 /* FUNCTIONS ****************************************************************/
 
+INIT_FUNCTION
 NTSTATUS
 NTAPI
-INIT_FUNCTION
 ExpCreateSystemRootLink(IN PLOADER_PARAMETER_BLOCK LoaderBlock)
 {
     UNICODE_STRING LinkName;
@@ -203,9 +203,9 @@ ExpCreateSystemRootLink(IN PLOADER_PARAMETER_BLOCK LoaderBlock)
     return STATUS_SUCCESS;
 }
 
+INIT_FUNCTION
 VOID
 NTAPI
-INIT_FUNCTION
 ExpInitNls(IN PLOADER_PARAMETER_BLOCK LoaderBlock)
 {
     LARGE_INTEGER SectionSize;
@@ -379,9 +379,9 @@ ExpInitNls(IN PLOADER_PARAMETER_BLOCK LoaderBlock)
     ExpNlsTableBase = SectionBase;
 }
 
+INIT_FUNCTION
 VOID
 NTAPI
-INIT_FUNCTION
 ExpLoadInitialProcess(IN PINIT_BUFFER InitBuffer,
                       OUT PRTL_USER_PROCESS_PARAMETERS *ProcessParameters,
                       OUT PCHAR *ProcessEnvironment)
@@ -596,9 +596,9 @@ ExpLoadInitialProcess(IN PINIT_BUFFER InitBuffer,
     *ProcessEnvironment = EnvironmentPtr;
 }
 
+INIT_FUNCTION
 ULONG
 NTAPI
-INIT_FUNCTION
 ExComputeTickCountMultiplier(IN ULONG ClockIncrement)
 {
     ULONG MsRemainder = 0, MsIncrement;
@@ -629,9 +629,9 @@ ExComputeTickCountMultiplier(IN ULONG ClockIncrement)
     return (MsIncrement << 24) | MsRemainder;
 }
 
+INIT_FUNCTION
 BOOLEAN
 NTAPI
-INIT_FUNCTION
 ExpInitSystemPhase0(VOID)
 {
     /* Initialize EXRESOURCE Support */
@@ -652,9 +652,9 @@ ExpInitSystemPhase0(VOID)
     return TRUE;
 }
 
+INIT_FUNCTION
 BOOLEAN
 NTAPI
-INIT_FUNCTION
 ExpInitSystemPhase1(VOID)
 {
     /* Initialize worker threads */
@@ -711,7 +711,11 @@ ExpInitSystemPhase1(VOID)
     }
 
     /* Initialize UUIDs */
-    ExpInitUuids();
+    if (ExpUuidInitialization() == FALSE)
+    {
+        DPRINT1("Executive: Uuid initialization failed\n");
+        return FALSE;
+    }
 
     /* Initialize keyed events */
     if (ExpInitializeKeyedEventImplementation() == FALSE)
@@ -729,9 +733,9 @@ ExpInitSystemPhase1(VOID)
     return TRUE;
 }
 
+INIT_FUNCTION
 BOOLEAN
 NTAPI
-INIT_FUNCTION
 ExInitSystem(VOID)
 {
     /* Check the initialization phase */
@@ -755,9 +759,9 @@ ExInitSystem(VOID)
     }
 }
 
+INIT_FUNCTION
 BOOLEAN
 NTAPI
-INIT_FUNCTION
 ExpIsLoaderValid(IN PLOADER_PARAMETER_BLOCK LoaderBlock)
 {
     PLOADER_PARAMETER_EXTENSION Extension;
@@ -781,9 +785,9 @@ ExpIsLoaderValid(IN PLOADER_PARAMETER_BLOCK LoaderBlock)
     return TRUE;
 }
 
+INIT_FUNCTION
 VOID
 NTAPI
-INIT_FUNCTION
 ExpLoadBootSymbols(IN PLOADER_PARAMETER_BLOCK LoaderBlock)
 {
     ULONG i = 0;
@@ -862,9 +866,9 @@ ExpLoadBootSymbols(IN PLOADER_PARAMETER_BLOCK LoaderBlock)
     }
 }
 
+INIT_FUNCTION
 VOID
 NTAPI
-INIT_FUNCTION
 ExBurnMemory(IN PLOADER_PARAMETER_BLOCK LoaderBlock,
              IN ULONG_PTR PagesToDestroy,
              IN TYPE_OF_MEMORY MemoryType)
@@ -908,9 +912,9 @@ ExBurnMemory(IN PLOADER_PARAMETER_BLOCK LoaderBlock,
     }
 }
 
+INIT_FUNCTION
 VOID
 NTAPI
-INIT_FUNCTION
 ExpInitializeExecutive(IN ULONG Cpu,
                        IN PLOADER_PARAMETER_BLOCK LoaderBlock)
 {
@@ -1327,9 +1331,9 @@ VOID
 NTAPI
 MmFreeLoaderBlock(IN PLOADER_PARAMETER_BLOCK LoaderBlock);
 
+INIT_FUNCTION
 VOID
 NTAPI
-INIT_FUNCTION
 Phase1InitializationDiscard(IN PVOID Context)
 {
     PLOADER_PARAMETER_BLOCK LoaderBlock = Context;
@@ -1788,10 +1792,8 @@ Phase1InitializationDiscard(IN PVOID Context)
     /* Update progress bar */
     InbvUpdateProgressBar(25);
 
-#ifdef _WINKD_
     /* No KD Time Slip is pending */
     KdpTimeSlipPending = 0;
-#endif
 
     /* Initialize in-place execution support */
     XIPInit(LoaderBlock);

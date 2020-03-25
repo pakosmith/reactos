@@ -7,9 +7,11 @@
 #include <kmt_test.h>
 
 KMT_TESTFUNC Test_CcCopyRead;
+KMT_TESTFUNC Test_CcCopyWrite;
 KMT_TESTFUNC Test_CcMapData;
 KMT_TESTFUNC Test_CcPinMappedData;
 KMT_TESTFUNC Test_CcPinRead;
+KMT_TESTFUNC Test_CcSetFileSizes;
 KMT_TESTFUNC Test_Example;
 KMT_TESTFUNC Test_FileAttributes;
 KMT_TESTFUNC Test_FindFile;
@@ -29,6 +31,7 @@ KMT_TESTFUNC Test_RtlMemory;
 KMT_TESTFUNC Test_RtlRegistry;
 KMT_TESTFUNC Test_RtlSplayTree;
 KMT_TESTFUNC Test_RtlStack;
+KMT_TESTFUNC Test_RtlStrSafe;
 KMT_TESTFUNC Test_RtlUnicodeString;
 KMT_TESTFUNC Test_TcpIpIoctl;
 KMT_TESTFUNC Test_TcpIpTdi;
@@ -38,9 +41,11 @@ KMT_TESTFUNC Test_TcpIpConnect;
 const KMT_TEST TestList[] =
 {
     { "CcCopyRead",                   Test_CcCopyRead },
+    { "CcCopyWrite",                  Test_CcCopyWrite },
     { "CcMapData",                    Test_CcMapData },
     { "CcPinMappedData",              Test_CcPinMappedData },
     { "CcPinRead",                    Test_CcPinRead },
+    { "CcSetFileSizes",               Test_CcSetFileSizes },
     { "-Example",                     Test_Example },
     { "FileAttributes",               Test_FileAttributes },
     { "FindFile",                     Test_FindFile },
@@ -60,6 +65,7 @@ const KMT_TEST TestList[] =
     { "RtlRegistry",                  Test_RtlRegistry },
     { "RtlSplayTree",                 Test_RtlSplayTree },
     { "RtlStack",                     Test_RtlStack },
+    { "RtlStrSafe",                   Test_RtlStrSafe },
     { "RtlUnicodeString",             Test_RtlUnicodeString },
     { "TcpIpTdi",                     Test_TcpIpTdi },
     { "TcpIpConnect",                 Test_TcpIpConnect },

@@ -245,9 +245,9 @@
 // #ifdef LANGUAGE_HR_HR
     // #include "lang/hr-HR.h"
 // #endif
-// #ifdef LANGUAGE_HU_HU
-    // #include "lang/hu-HU.h"
-// #endif
+#ifdef LANGUAGE_HU_HU
+    #include "lang/hu-HU.h"
+#endif
 // #ifdef LANGUAGE_HY_AM
     // #include "lang/hy-AM.h"
 // #endif
@@ -326,9 +326,9 @@
 #ifdef LANGUAGE_PT_BR
     #include "lang/pt-BR.h"
 #endif
-// #ifdef LANGUAGE_PT_PT
-    // #include "lang/pt-PT.h"
-// #endif
+#ifdef LANGUAGE_PT_PT
+    #include "lang/pt-PT.h"
+#endif
 // #ifdef LANGUAGE_RM_CH
     // #include "lang/rm-CH.h"
 // #endif
@@ -637,7 +637,7 @@ const MUI_LANGUAGE_RESOURCE ResourceList[] =
     {L"00000439", L"Hindi", enUSPages, enUSErrorEntries, enUSStrings},
 #endif
 #ifdef LANGUAGE_HU_HU
-    {L"0000040E", L"Hungarian", enUSPages, enUSErrorEntries, enUSStrings},
+    {L"0000040E", L"Hungarian", huHUPages, huHUErrorEntries, huHUStrings},
 #endif
 #ifdef LANGUAGE_IS_IS
     {L"0000040F", L"Icelandic", enUSPages, enUSErrorEntries, enUSStrings},
@@ -699,11 +699,11 @@ const MUI_LANGUAGE_RESOURCE ResourceList[] =
 #ifdef LANGUAGE_PL_PL
     {L"00000415", L"Polish", plPLPages, plPLErrorEntries, plPLStrings},
 #endif
-#ifdef LANGUAGE_PT_PT
-    {L"00000816", L"Portuguese (Portugal)", enUSPages, enUSErrorEntries, enUSStrings},
-#endif
 #ifdef LANGUAGE_PT_BR
     {L"00000416", L"Portuguese (Brazil)", ptBRPages, ptBRErrorEntries, ptBRStrings},
+#endif
+#ifdef LANGUAGE_PT_PT
+    {L"00000816", L"Portuguese (Portugal)", ptPTPages, ptPTErrorEntries, ptPTStrings},
 #endif
 #ifdef LANGUAGE_PA_IN
     {L"00000446", L"Punjabi (India)", enUSPages, enUSErrorEntries, enUSStrings},

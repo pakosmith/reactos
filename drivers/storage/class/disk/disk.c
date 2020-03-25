@@ -116,6 +116,15 @@ typedef struct _DISK_DATA {
 
     PARTITION_LIST_STATE PartitionListState;
 
+#ifdef __REACTOS__
+    //
+    // HACK so that we can use NT5+ NTOS functions with this NT4 driver
+    // for removable devices and avoid an infinite recursive loop between
+    // disk!UpdateRemovableGeometry() and ntos!IoReadPartitionTable().
+    //
+    ULONG UpdateRemovableGeometryCount;
+#endif
+
 } DISK_DATA, *PDISK_DATA;
 
 //
@@ -960,12 +969,14 @@ Return Value:
     // IsFloppyDevice also checks for write cache enabled.
     //
 
+#if 0
     if (IsFloppyDevice(deviceObject) && deviceObject->Characteristics & FILE_REMOVABLE_MEDIA &&
         (((PINQUIRYDATA)LunInfo->InquiryData)->DeviceType == DIRECT_ACCESS_DEVICE)) {
 
         status = STATUS_NO_SUCH_DEVICE;
         goto CreateDiskDeviceObjectsExit;
     }
+#endif
 
     DisableWriteCache(deviceObject,LunInfo);
 
@@ -1057,6 +1068,129 @@ CreateDiskDeviceObjectsExit:
 } // end CreateDiskDeviceObjects()
 
 
+VOID
+NTAPI
+ReportToMountMgr(
+    IN PDEVICE_OBJECT DiskDeviceObject
+    )
+
+/*++
+
+Routine Description:
+
+    This routine reports the creation of a disk device object to the
+    MountMgr to fake PnP.
+
+Arguments:
+
+    DiskDeviceObject - Pointer to the created disk device.
+
+Return Value:
+
+    VOID
+
+--*/
+{
+    NTSTATUS              status;
+    UNICODE_STRING        mountMgrDevice;
+    PDEVICE_OBJECT        deviceObject;
+    PFILE_OBJECT          fileObject;
+    PMOUNTMGR_TARGET_NAME mountTarget;
+    ULONG                 diskLen;
+    PDEVICE_EXTENSION     deviceExtension;
+    PIRP                  irp;
+    KEVENT                event;
+    IO_STATUS_BLOCK       ioStatus;
+
+    //
+    // First, get MountMgr DeviceObject.
+    //
+
+    RtlInitUnicodeString(&mountMgrDevice, MOUNTMGR_DEVICE_NAME);
+    status = IoGetDeviceObjectPointer(&mountMgrDevice, FILE_READ_ATTRIBUTES,
+                                      &fileObject, &deviceObject);
+
+    if (!NT_SUCCESS(status)) {
+
+        DebugPrint((1,
+                   "ReportToMountMgr: Can't get MountMgr pointers %lx\n",
+                   status));
+
+        return;
+    }
+
+    deviceExtension = DiskDeviceObject->DeviceExtension;
+    diskLen = deviceExtension->DeviceName.Length;
+
+    //
+    // Allocate input buffer to report our partition device.
+    //
+
+    mountTarget = ExAllocatePool(NonPagedPool,
+                                 sizeof(MOUNTMGR_TARGET_NAME) + diskLen);
+
+    if (!mountTarget) {
+
+        DebugPrint((1,
+                   "ReportToMountMgr: Allocation of mountTarget failed\n"));
+
+        ObDereferenceObject(fileObject);
+        return;
+    }
+
+    mountTarget->DeviceNameLength = diskLen;
+    RtlCopyMemory(mountTarget->DeviceName, deviceExtension->DeviceName.Buffer, diskLen);
+
+    KeInitializeEvent(&event, NotificationEvent, FALSE);
+
+    //
+    // Build the IRP used to communicate with the MountMgr.
+    //
+
+    irp = IoBuildDeviceIoControlRequest(IOCTL_MOUNTMGR_VOLUME_ARRIVAL_NOTIFICATION,
+                                        deviceObject,
+                                        mountTarget,
+                                        sizeof(MOUNTMGR_TARGET_NAME) + diskLen,
+                                        NULL,
+                                        0,
+                                        FALSE,
+                                        &event,
+                                        &ioStatus);
+
+    if (!irp) {
+
+        DebugPrint((1,
+                    "ReportToMountMgr: Allocation of irp failed\n"));
+
+        ExFreePool(mountTarget);
+        ObDereferenceObject(fileObject);
+        return;
+    }
+
+    //
+    // Call the MountMgr.
+    //
+
+    status = IoCallDriver(deviceObject, irp);
+
+    if (status == STATUS_PENDING) {
+        KeWaitForSingleObject(&event, Suspended, KernelMode, FALSE, NULL);
+        status = ioStatus.Status;
+    }
+
+    //
+    // We're done.
+    //
+
+    DPRINT1("Reported to the MountMgr: %lx\n", status);
+
+    ExFreePool(mountTarget);
+    ObDereferenceObject(fileObject);
+
+    return;
+}
+
+
 NTSTATUS
 NTAPI
 CreatePartitionDeviceObjects(
@@ -1146,6 +1280,15 @@ CreatePartitionDeviceObjects(
         dmByteSkew = physicalDeviceExtension->DMByteSkew;
 
     }
+
+#ifdef __REACTOS__
+    //
+    // HACK so that we can use NT5+ NTOS functions with this NT4 driver
+    // for removable devices and avoid an infinite recursive loop between
+    // disk!UpdateRemovableGeometry() and ntos!IoReadPartitionTable().
+    //
+    diskData->UpdateRemovableGeometryCount = 0;
+#endif
 
     //
     // Create objects for all the partitions on the device.
@@ -1439,6 +1582,14 @@ CreatePartitionDeviceObjects(
             deviceExtension->SectorShift  = sectorShift;
             deviceExtension->DeviceObject = deviceObject;
             deviceExtension->DeviceFlags |= physicalDeviceExtension->DeviceFlags;
+
+            //
+            // Now we're done, report to the MountMgr.
+            // This is a HACK required to have the driver
+            // handle the associated DosDevices.
+            //
+
+            ReportToMountMgr(deviceObject);
 
         } // end for (partitionNumber) ...
 
@@ -4456,6 +4607,21 @@ Return Value:
         return(status);
     }
 
+#ifdef __REACTOS__
+    //
+    // HACK so that we can use NT5+ NTOS functions with this NT4 driver
+    // for removable devices and avoid an infinite recursive loop between
+    // disk!UpdateRemovableGeometry() and ntos!IoReadPartitionTable().
+    //
+    // Check whether the update-count is greater or equal than one
+    // (and increase it) and if so, reset it and return success.
+    if (diskData->UpdateRemovableGeometryCount++ >= 1)
+    {
+        diskData->UpdateRemovableGeometryCount = 0;
+        return(STATUS_SUCCESS);
+    }
+#endif
+
     //
     // Read the partition table again.
     //
@@ -4465,6 +4631,15 @@ Return Value:
                       TRUE,
                       &partitionList);
 
+#ifdef __REACTOS__
+    //
+    // HACK so that we can use NT5+ NTOS functions with this NT4 driver
+    // for removable devices and avoid an infinite recursive loop between
+    // disk!UpdateRemovableGeometry() and ntos!IoReadPartitionTable().
+    //
+    // Inconditionally reset the update-count.
+    diskData->UpdateRemovableGeometryCount = 0;
+#endif
 
     if (!NT_SUCCESS(status)) {
 

@@ -21,8 +21,8 @@ VfatCommonCloseFile(
     PDEVICE_EXTENSION DeviceExt,
     PVFATFCB pFcb)
 {
-    /* Nothing to do for volumes */
-    if (BooleanFlagOn(pFcb->Flags, FCB_IS_VOLUME))
+    /* Nothing to do for volumes or for the FAT file object */
+    if (BooleanFlagOn(pFcb->Flags, FCB_IS_FAT | FCB_IS_VOLUME))
     {
         return;
     }
@@ -163,6 +163,7 @@ VfatCloseFile(
 {
     PVFATFCB pFcb;
     PVFATCCB pCcb;
+    BOOLEAN IsVolume;
     NTSTATUS Status = STATUS_SUCCESS;
 
     DPRINT("VfatCloseFile(DeviceExt %p, FileObject %p)\n",
@@ -176,6 +177,8 @@ VfatCloseFile(
     {
         return STATUS_SUCCESS;
     }
+
+    IsVolume = BooleanFlagOn(pFcb->Flags, FCB_IS_VOLUME);
 
     if (pCcb)
     {
@@ -194,7 +197,7 @@ VfatCloseFile(
     FileObject->SectionObjectPointer = NULL;
 
 #ifdef ENABLE_SWAPOUT
-    if (BooleanFlagOn(pFcb->Flags, FCB_IS_VOLUME) && DeviceExt->OpenHandleCount == 0)
+    if (IsVolume && DeviceExt->OpenHandleCount == 0)
     {
         VfatCheckForDismount(DeviceExt, FALSE);
     }

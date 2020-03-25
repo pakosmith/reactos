@@ -4,23 +4,29 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     # no optimization
     add_compile_flags("/Ob0 /Od")
 elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
-    add_compile_flags("/Ox /Ob2 /Ot /Oy /GT /GF")
+    add_compile_flags("/Ox /Ob2 /Ot /Oy /GT")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /OPT:REF /OPT:ICF")
 elseif(OPTIMIZE STREQUAL "1")
-    add_definitions(/O1)
+    add_compile_flags("/O1")
 elseif(OPTIMIZE STREQUAL "2")
-    add_definitions(/O2)
+    add_compile_flags("/O2")
 elseif(OPTIMIZE STREQUAL "3")
-    add_definitions(/Ot /Ox /GS-)
+    add_compile_flags("/Ot /Ox /GS-")
 elseif(OPTIMIZE STREQUAL "4")
-    add_definitions(/Os /Ox /GS-)
+    add_compile_flags("/Os /Ox /GS-")
 elseif(OPTIMIZE STREQUAL "5")
-    add_definitions(/GF /Gy /Ob2 /Os /Ox /GS-)
+    add_compile_flags("/Gy /Ob2 /Os /Ox /GS-")
 endif()
+
+# Always use string pooling: this helps reducing the binaries size since a lot
+# of redundancy come from the usage of __FILE__ / __RELFILE__ in the debugging
+# helper macros. Note also that GCC builds use string pooling by default.
+add_compile_flags("/GF")
 
 # Enable function level linking and comdat folding
 add_compile_flags("/Gy")
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /OPT:REF /OPT:ICF")
+set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} /OPT:REF /OPT:ICF")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /OPT:REF /OPT:ICF")
 
 if(ARCH STREQUAL "i386")
@@ -29,11 +35,14 @@ endif()
 
 add_definitions(/Dinline=__inline /D__STDC__=1)
 
+# Ignore any "standard" include paths, and do not use any default CRT library.
 if(NOT USE_CLANG_CL)
     add_compile_flags("/X /Zl")
 endif()
 
-add_compile_flags("/GR- /EHs-c- /GS- /W3")
+# Disable RTTI, exception handling and buffer security checks by default.
+# These require run-time support that may not always be available.
+add_compile_flags("/GR- /EHs-c- /GS-")
 
 if(USE_CLANG_CL)
     set(CMAKE_CL_SHOWINCLUDES_PREFIX "Note: including file: ")
@@ -55,6 +64,16 @@ if(MSVC_VERSION GREATER 1899)
     add_compile_flags("/Zc:threadSafeInit-")
 endif ()
 
+# HACK: Disable use of __CxxFrameHandler4 on VS 16.3+ (x64 only)
+# See https://developercommunity.visualstudio.com/content/problem/746534/visual-c-163-runtime-uses-an-unsupported-api-for-u.html
+if(ARCH STREQUAL "amd64" AND MSVC_VERSION GREATER 1922)
+    add_compile_flags("/d2FH4-")
+    add_link_options("/d2:-FH4-")
+endif ()
+
+# Generate Warnings Level 3
+add_compile_flags("/W3")
+
 # Disable overly sensitive warnings as well as those that generally aren't
 # useful to us.
 # - C4244: implicit integer truncation
@@ -71,20 +90,26 @@ add_compile_flags("/wd4018")
 # - C4013: implicit function declaration
 # - C4020: too many actual parameters
 # - C4022: pointer type mismatch for parameter
-# - TODO: C4028: formal parameter different from declaration
+# - C4028: formal parameter different from declaration
 # - C4047: different level of indirection
 # - TODO: C4090: different 'modifier' qualifiers (for C programs only;
 #          for C++ programs, the compiler error C2440 is issued)
 # - C4098: void function returning a value
+# - C4101: unreferenced local variable
 # - C4113: parameter lists differ
 # - C4129: unrecognized escape sequence
-# - TODO: C4133: incompatible types
+# - C4133: incompatible types - from '<x> *' to '<y> *'
 # - C4163: 'identifier': not available as an intrinsic function
 # - C4229: modifiers on data are ignored
-# - C4700: uninitialized variable usage
+# - C4311: pointer truncation from '<pointer>' to '<integer>'
+# - C4312: conversion from '<integer>' to '<pointer>' of greater size
+# - C4313: 'fprintf': '%x' in format string conflicts with argument n of type 'HANDLE'
+# - C4477: '_snprintf' : format string '%ld' requires an argument of type 'long', but variadic argument 1 has type 'DWORD_PTR'
 # - C4603: macro is not defined or definition is different after precompiled header use
+# - C4700: uninitialized variable usage
+# - C4715: 'function': not all control paths return a value
 # - C4716: function must return a value
-add_compile_flags("/we4013 /we4020 /we4022 /we4047 /we4098 /we4113 /we4129 /we4163 /we4229 /we4700 /we4603 /we4716")
+add_compile_flags("/we4013 /we4020 /we4022 /we4028 /we4047 /we4098 /we4101 /we4113 /we4129 /we4133 /we4163 /we4229 /we4311 /we4312 /we4313 /we4477 /we4603 /we4700 /we4715 /we4716")
 
 # - C4189: local variable initialized but not referenced
 # Not in Release mode and not with MSVC 2010
@@ -135,15 +160,17 @@ if(RUNTIME_CHECKS)
     add_compile_flags("/RTC1")
 endif()
 
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /MANIFEST:NO /INCREMENTAL:NO /SAFESEH:NO /NODEFAULTLIB /RELEASE ${_hotpatch_link_flag}")
-set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /MANIFEST:NO /INCREMENTAL:NO /SAFESEH:NO /NODEFAULTLIB /RELEASE /IGNORE:4104 ${_hotpatch_link_flag}")
-set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} /MANIFEST:NO /INCREMENTAL:NO /SAFESEH:NO /NODEFAULTLIB /RELEASE ${_hotpatch_link_flag}")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /MANIFEST:NO /INCREMENTAL:NO /SAFESEH:NO /NODEFAULTLIB /RELEASE ${_hotpatch_link_flag} /IGNORE:4039")
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /MANIFEST:NO /INCREMENTAL:NO /SAFESEH:NO /NODEFAULTLIB /RELEASE ${_hotpatch_link_flag} /IGNORE:4104 /IGNORE:4039")
+set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} /MANIFEST:NO /INCREMENTAL:NO /SAFESEH:NO /NODEFAULTLIB /RELEASE ${_hotpatch_link_flag} /IGNORE:4039")
 
 # HACK: Remove the /implib argument, implibs are generated separately
 string(REPLACE "/implib:<TARGET_IMPLIB>" "" CMAKE_C_LINK_EXECUTABLE "${CMAKE_C_LINK_EXECUTABLE}")
 string(REPLACE "/implib:<TARGET_IMPLIB>" "" CMAKE_CXX_LINK_EXECUTABLE "${CMAKE_CXX_LINK_EXECUTABLE}")
 string(REPLACE "/implib:<TARGET_IMPLIB>" "" CMAKE_C_CREATE_SHARED_LIBRARY "${CMAKE_C_CREATE_SHARED_LIBRARY}")
 string(REPLACE "/implib:<TARGET_IMPLIB>" "" CMAKE_CXX_CREATE_SHARED_LIBRARY "${CMAKE_CXX_CREATE_SHARED_LIBRARY}")
+string(REPLACE "/implib:<TARGET_IMPLIB>" "" CMAKE_C_CREATE_SHARED_MODULE "${CMAKE_C_CREATE_SHARED_MODULE}")
+string(REPLACE "/implib:<TARGET_IMPLIB>" "" CMAKE_CXX_CREATE_SHARED_MODULE "${CMAKE_CXX_CREATE_SHARED_MODULE}")
 
 if(CMAKE_DISABLE_NINJA_DEPSLOG)
     set(cl_includes_flag "")
@@ -208,6 +235,8 @@ endif()
 
 set(CMAKE_RC_CREATE_SHARED_LIBRARY ${CMAKE_C_CREATE_SHARED_LIBRARY})
 set(CMAKE_ASM_CREATE_SHARED_LIBRARY ${CMAKE_C_CREATE_SHARED_LIBRARY})
+set(CMAKE_RC_CREATE_SHARED_MODULE ${CMAKE_C_CREATE_SHARED_MODULE})
+set(CMAKE_ASM_CREATE_SHARED_MODULE ${CMAKE_C_CREATE_SHARED_MODULE})
 set(CMAKE_ASM_CREATE_STATIC_LIBRARY ${CMAKE_C_CREATE_STATIC_LIBRARY})
 
 if(PCH)
@@ -309,9 +338,9 @@ function(set_module_type_toolchain MODULE TYPE)
         add_target_link_flags(${MODULE} "/DLL")
     elseif(${TYPE} STREQUAL "kernelmodedriver")
         # Disable linker warning 4078 (multiple sections found with different attributes) for INIT section use
-        add_target_link_flags(${MODULE} "/DRIVER /IGNORE:4078")
+        add_target_link_flags(${MODULE} "/DRIVER /IGNORE:4078 /SECTION:INIT,D")
     elseif(${TYPE} STREQUAL "wdmdriver")
-        add_target_link_flags(${MODULE} "/DRIVER:WDM /IGNORE:4078")
+        add_target_link_flags(${MODULE} "/DRIVER:WDM /IGNORE:4078 /SECTION:INIT,D")
     endif()
 
     if(RUNTIME_CHECKS)
@@ -377,7 +406,7 @@ function(generate_import_lib _libname _dllname _spec_file)
     # Add our library
     if(MSVC_IDE)
         add_library(${_libname} STATIC EXCLUDE_FROM_ALL ${_asm_stubs_file}.obj)
-        set_source_files_properties(${_asm_stubs_file}.obj PROPERTIES EXTERNAL_OBJECT 1)
+        set_source_files_properties(${_asm_stubs_file}.obj PROPERTIES EXTERNAL_OBJECT TRUE)
         set_target_properties(${_libname} PROPERTIES LINKER_LANGUAGE "C")
     else()
         # NOTE: as stub file and def file are generated in one pass, depending on one is like depending on the other
@@ -457,6 +486,9 @@ function(CreateBootSectorTarget _target_name _asm_file _binary_file _base_addres
     set(_object_file ${_binary_file}.obj)
     set(_temp_file ${_binary_file}.tmp)
 
+    get_defines(_defines)
+    get_includes(_includes)
+
     if(USE_CLANG_CL)
         set(_no_std_includes_flag "-nostdinc")
     else()
@@ -465,7 +497,7 @@ function(CreateBootSectorTarget _target_name _asm_file _binary_file _base_addres
 
     add_custom_command(
         OUTPUT ${_temp_file}
-        COMMAND ${CMAKE_C_COMPILER} /nologo ${_no_std_includes_flag} /I${REACTOS_SOURCE_DIR}/sdk/include/asm /I${REACTOS_BINARY_DIR}/sdk/include/asm /I${REACTOS_SOURCE_DIR}/boot/freeldr /D__ASM__ /D_USE_ML /EP /c ${_asm_file} > ${_temp_file}
+        COMMAND ${CMAKE_C_COMPILER} /nologo ${_no_std_includes_flag} /I${REACTOS_SOURCE_DIR}/sdk/include/asm /I${REACTOS_BINARY_DIR}/sdk/include/asm ${_includes} ${_defines} /D__ASM__ /D_USE_ML /EP /c ${_asm_file} > ${_temp_file}
         DEPENDS ${_asm_file})
 
     if(ARCH STREQUAL "arm")
@@ -518,10 +550,82 @@ macro(add_asm_files _target)
                 OUTPUT ${_preprocessed_asm_file} ${_object_file}
                 COMMAND cl /nologo /X /I${REACTOS_SOURCE_DIR}/sdk/include/asm /I${REACTOS_BINARY_DIR}/sdk/include/asm ${_directory_includes} ${_source_file_defines} ${_directory_defines} /D__ASM__ /D_USE_ML /EP /c ${_source_file_full_path} > ${_preprocessed_asm_file} && ${_pp_asm_compile_command}
                 DEPENDS ${_source_file_full_path})
-            set_source_files_properties(${_object_file} PROPERTIES EXTERNAL_OBJECT 1)
+            set_source_files_properties(${_object_file} PROPERTIES EXTERNAL_OBJECT TRUE)
             list(APPEND ${_target} ${_object_file})
         endforeach()
     else()
         list(APPEND ${_target} ${ARGN})
     endif()
 endmacro()
+
+function(add_linker_script _target _linker_script_file)
+    get_filename_component(_file_full_path ${_linker_script_file} ABSOLUTE)
+    get_filename_component(_file_name ${_linker_script_file} NAME)
+    set(_generated_file_path_prefix "${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/${_target}.dir/${_file_name}")
+
+    # Generate the ASM module containing sections specifications and layout.
+    set(_generated_file "${_generated_file_path_prefix}.S")
+    add_custom_command(
+        OUTPUT ${_generated_file}
+        COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${_file_full_path}" "${_generated_file}"
+        DEPENDS ${_file_full_path})
+    set_source_files_properties(${_generated_file} PROPERTIES LANGUAGE "ASM" GENERATED TRUE)
+    add_asm_files(${_target}_linker_file ${_generated_file})
+
+    # Generate the C module containing extra sections specifications and layout,
+    # as well as comment-type linker #pragma directives.
+    set(_generated_file "${_generated_file_path_prefix}.c")
+    add_custom_command(
+        OUTPUT ${_generated_file}
+        COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${_file_full_path}" "${_generated_file}"
+        DEPENDS ${_file_full_path})
+    set_source_files_properties(${_generated_file} PROPERTIES LANGUAGE "C" GENERATED TRUE)
+    list(APPEND ${_target}_linker_file ${_generated_file})
+
+    # Add both files to the sources of the target.
+    target_sources(${_target} PRIVATE "${${_target}_linker_file}")
+
+    # Create the additional linker response file.
+    set(_generated_file "${_generated_file_path_prefix}.rsp")
+    if(USE_CLANG_CL)
+        set(_no_std_includes_flag "-nostdinc")
+    else()
+        set(_no_std_includes_flag "/X")
+    endif()
+    if(MSVC_IDE AND (CMAKE_VERSION MATCHES "ReactOS"))
+        # MSBuild, via the VS IDE, uses response files when calling CL or LINK.
+        # We cannot specify a custom response file on the linker command-line,
+        # since specifying response files from within response files is forbidden.
+        # We therefore have to pre-process, at configuration time, the linker
+        # script so as to retrieve the custom linker options to be appended
+        # to the linker command-line.
+        execute_process(
+            COMMAND ${CMAKE_C_COMPILER} /nologo ${_no_std_includes_flag} /D__LINKER__ /EP /c "${_file_full_path}"
+            # OUTPUT_FILE "${_generated_file}"
+            OUTPUT_VARIABLE linker_options
+            ERROR_QUIET
+            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+            RESULT_VARIABLE linker_rsp_result
+            OUTPUT_STRIP_TRAILING_WHITESPACE)
+        if(NOT linker_rsp_result EQUAL 0)
+            message(FATAL_ERROR "Generating pre-processed linker options for target '${_target}' failed with error ${linker_rsp_result}.")
+        endif()
+        # file(STRINGS ${_generated_file} linker_options NEWLINE_CONSUME)
+        string(REGEX REPLACE "[\r\n]+" " " linker_options "${linker_options}")
+        add_target_link_flags(${_target} ${linker_options})
+    else()
+        # Generate at compile-time a linker response file and append it
+        # to the linker command-line.
+        add_custom_command(
+            # OUTPUT ${_generated_file}
+            TARGET ${_target} PRE_LINK # PRE_BUILD
+            COMMAND ${CMAKE_C_COMPILER} /nologo ${_no_std_includes_flag} /D__LINKER__ /EP /c "${_file_full_path}" > "${_generated_file}"
+            DEPENDS ${_file_full_path}
+            VERBATIM)
+        set_source_files_properties(${_generated_file} PROPERTIES GENERATED TRUE)
+        # add_custom_target("${_target}_${_file_name}" ALL DEPENDS ${_generated_file})
+        # add_dependencies(${_target} "${_target}_${_file_name}")
+        add_target_link_flags(${_target} "@${_generated_file}")
+        add_target_property(${_target} LINK_DEPENDS ${_file_full_path})
+    endif()
+endfunction()

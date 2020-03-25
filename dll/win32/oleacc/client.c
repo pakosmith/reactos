@@ -20,7 +20,6 @@
 
 #include "oleacc_private.h"
 
-#include "wine/unicode.h"
 #include "wine/debug.h"
 #include "wine/heap.h"
 
@@ -168,7 +167,7 @@ static HRESULT WINAPI Client_get_accName(IAccessible *iface, VARIANT varID, BSTR
     if(convert_child_id(&varID) != CHILDID_SELF || !IsWindow(This->hwnd))
         return E_INVALIDARG;
 
-    len = SendMessageW(This->hwnd, WM_GETTEXT, sizeof(name)/sizeof(WCHAR), (LPARAM)name);
+    len = SendMessageW(This->hwnd, WM_GETTEXT, ARRAY_SIZE(name), (LPARAM)name);
     if(!len)
         return S_FALSE;
 
@@ -286,7 +285,7 @@ static HRESULT WINAPI Client_get_accKeyboardShortcut(IAccessible *iface,
     if(convert_child_id(&varID) != CHILDID_SELF)
         return E_INVALIDARG;
 
-    len = SendMessageW(This->hwnd, WM_GETTEXT, sizeof(name)/sizeof(WCHAR), (LPARAM)name);
+    len = SendMessageW(This->hwnd, WM_GETTEXT, ARRAY_SIZE(name), (LPARAM)name);
     for(i=0; i<len; i++) {
         if(name[i] == '&')
             break;
@@ -353,7 +352,7 @@ static HRESULT WINAPI Client_accLocation(IAccessible *iface, LONG *pxLeft,
     if(!GetClientRect(This->hwnd, &rect))
         return S_OK;
 
-    pt.x = rect.left,
+    pt.x = rect.left;
     pt.y = rect.top;
     MapWindowPoints(This->hwnd, NULL, &pt, 1);
     *pxLeft = pt.x;

@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2018, Intel Corp.
+ * Copyright (C) 2000 - 2020, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -46,7 +46,7 @@
 
 /* Current ACPICA subsystem version in YYYYMMDD format */
 
-#define ACPI_CA_VERSION                 0x20181003
+#define ACPI_CA_VERSION                 0x20200214
 
 #include "acconfig.h"
 #include "actypes.h"
@@ -191,21 +191,6 @@ ACPI_INIT_GLOBAL (UINT8,            AcpiGbl_CopyDsdtLocally, FALSE);
  * some machines. Default behavior is to use the XSDT if present.
  */
 ACPI_INIT_GLOBAL (UINT8,            AcpiGbl_DoNotUseXsdt, FALSE);
-
-/*
- * Optionally support group module level code.
- * NOTE, this is essentially obsolete and will be removed soon
- * (01/2018).
- */
-ACPI_INIT_GLOBAL (UINT8,            AcpiGbl_GroupModuleLevelCode, FALSE);
-
-/*
- * Optionally support module level code by parsing an entire table as
- * a method as it is loaded. Default is TRUE.
- * NOTE, this is essentially obsolete and will be removed soon
- * (01/2018).
- */
-ACPI_INIT_GLOBAL (UINT8,            AcpiGbl_ExecuteTablesAsMethods, TRUE);
 
 /*
  * Optionally use 32-bit FADT addresses if and when there is a conflict
@@ -353,6 +338,9 @@ ACPI_GLOBAL (BOOLEAN,               AcpiGbl_SystemAwakeAndRunning);
 #define ACPI_HW_DEPENDENT_RETURN_OK(Prototype) \
     ACPI_EXTERNAL_RETURN_OK(Prototype)
 
+#define ACPI_HW_DEPENDENT_RETURN_UINT32(prototype) \
+    ACPI_EXTERNAL_RETURN_UINT32(prototype)
+
 #define ACPI_HW_DEPENDENT_RETURN_VOID(Prototype) \
     ACPI_EXTERNAL_RETURN_VOID(Prototype)
 
@@ -362,6 +350,9 @@ ACPI_GLOBAL (BOOLEAN,               AcpiGbl_SystemAwakeAndRunning);
 
 #define ACPI_HW_DEPENDENT_RETURN_OK(Prototype) \
     static ACPI_INLINE Prototype {return(AE_OK);}
+
+#define ACPI_HW_DEPENDENT_RETURN_UINT32(prototype) \
+    static ACPI_INLINE prototype {return(0);}
 
 #define ACPI_HW_DEPENDENT_RETURN_VOID(Prototype) \
     static ACPI_INLINE Prototype {return;}
@@ -565,7 +556,13 @@ AcpiInstallTable (
 ACPI_EXTERNAL_RETURN_STATUS (
 ACPI_STATUS
 AcpiLoadTable (
-    ACPI_TABLE_HEADER       *Table))
+    ACPI_TABLE_HEADER       *Table,
+    UINT32                  *TableIdx))
+
+ACPI_EXTERNAL_RETURN_STATUS (
+ACPI_STATUS
+AcpiUnloadTable (
+    UINT32                  TableIndex))
 
 ACPI_EXTERNAL_RETURN_STATUS (
 ACPI_STATUS
@@ -983,6 +980,12 @@ AcpiGetGpeStatus (
     UINT32                  GpeNumber,
     ACPI_EVENT_STATUS       *EventStatus))
 
+ACPI_HW_DEPENDENT_RETURN_UINT32 (
+UINT32
+AcpiDispatchGpe (
+    ACPI_HANDLE             GpeDevice,
+    UINT32                  GpeNumber))
+
 ACPI_HW_DEPENDENT_RETURN_STATUS (
 ACPI_STATUS
 AcpiDisableAllGpes (
@@ -996,6 +999,10 @@ AcpiEnableAllRuntimeGpes (
 ACPI_HW_DEPENDENT_RETURN_STATUS (
 ACPI_STATUS
 AcpiEnableAllWakeupGpes (
+    void))
+
+ACPI_HW_DEPENDENT_RETURN_UINT32 (
+    UINT32                  AcpiAnyGpeStatusSet (
     void))
 
 ACPI_HW_DEPENDENT_RETURN_STATUS (
@@ -1233,6 +1240,16 @@ void ACPI_INTERNAL_VAR_XFACE
 AcpiBiosError (
     const char              *ModuleName,
     UINT32                  LineNumber,
+    const char              *Format,
+    ...))
+
+ACPI_MSG_DEPENDENT_RETURN_VOID (
+ACPI_PRINTF_LIKE(4)
+void  ACPI_INTERNAL_VAR_XFACE
+AcpiBiosException (
+    const char              *ModuleName,
+    UINT32                  LineNumber,
+    ACPI_STATUS             Status,
     const char              *Format,
     ...))
 

@@ -20,6 +20,7 @@
  */
 
 #include "precomp.h"
+#include <process.h>
 
 WINE_DEFAULT_DEBUG_CHANNEL(shell);
 
@@ -28,6 +29,7 @@ typedef struct
     WCHAR   Drive;
     UINT    Options;
     UINT Result;
+    BOOL bFormattingNow;
 } FORMAT_DRIVE_CONTEXT, *PFORMAT_DRIVE_CONTEXT;
 
 EXTERN_C HPSXA WINAPI SHCreatePropSheetExtArrayEx(HKEY hKey, LPCWSTR pszSubKey, UINT max_iface, IDataObject *pDataObj);
@@ -411,8 +413,6 @@ InitializeFormatDriveDlg(HWND hwndDlg, PFORMAT_DRIVE_CONTEXT pContext)
     SendMessageW(hwndFileSystems, CB_SETCURSEL, dwDefault, 0);
     /* setup cluster combo */
     InsertDefaultClusterSizeForFs(hwndDlg, pContext);
-    /* hide progress control */
-    ShowWindow(GetDlgItem(hwndDlg, 28678), SW_HIDE);
 }
 
 static HWND FormatDrvDialog = NULL;
@@ -435,6 +435,8 @@ FormatExCB(
         case DONE:
             pSuccess = (PBOOLEAN)ActionInfo;
             bSuccess = (*pSuccess);
+            ShellMessageBoxW(shell32_hInstance, FormatDrvDialog, MAKEINTRESOURCEW(IDS_FORMAT_COMPLETE), MAKEINTRESOURCEW(IDS_FORMAT_TITLE), MB_OK | MB_ICONINFORMATION);
+            SendDlgItemMessageW(FormatDrvDialog, 28678, PBM_SETPOS, 0, 0);
             break;
 
         case VOLUMEINUSE:
@@ -521,7 +523,6 @@ FormatDrive(HWND hwndDlg, PFORMAT_DRIVE_CONTEXT pContext)
     }
 
     hDlgCtrl = GetDlgItem(hwndDlg, 28680);
-    ShowWindow(hDlgCtrl, SW_SHOW);
     SendMessageW(hDlgCtrl, PBM_SETRANGE, 0, MAKELPARAM(0, 100));
     bSuccess = FALSE;
 
@@ -563,7 +564,6 @@ FormatDrive(HWND hwndDlg, PFORMAT_DRIVE_CONTEXT pContext)
              ClusterSize,
              FormatExCB);
 
-    ShowWindow(hDlgCtrl, SW_HIDE);
     FormatDrvDialog = NULL;
     if (!bSuccess)
     {
@@ -577,6 +577,46 @@ FormatDrive(HWND hwndDlg, PFORMAT_DRIVE_CONTEXT pContext)
     {
         pContext->Result = FALSE;
     }
+}
+
+struct FORMAT_DRIVE_PARAMS
+{
+    HWND hwndDlg;
+    PFORMAT_DRIVE_CONTEXT pContext;
+};
+
+static unsigned __stdcall DoFormatDrive(void *args)
+{
+    FORMAT_DRIVE_PARAMS *pParams = reinterpret_cast<FORMAT_DRIVE_PARAMS *>(args);
+    HWND hwndDlg = pParams->hwndDlg;
+    PFORMAT_DRIVE_CONTEXT pContext = pParams->pContext;
+
+	/* Disable controls during format */
+    HMENU hSysMenu = GetSystemMenu(hwndDlg, FALSE);
+    EnableMenuItem(hSysMenu, SC_CLOSE, MF_BYCOMMAND | MF_GRAYED);
+    EnableWindow(GetDlgItem(hwndDlg, IDOK), FALSE);
+    EnableWindow(GetDlgItem(hwndDlg, IDCANCEL), FALSE);
+    EnableWindow(GetDlgItem(hwndDlg, 28673), FALSE);
+    EnableWindow(GetDlgItem(hwndDlg, 28677), FALSE);
+    EnableWindow(GetDlgItem(hwndDlg, 28680), FALSE);
+    EnableWindow(GetDlgItem(hwndDlg, 28679), FALSE);
+    EnableWindow(GetDlgItem(hwndDlg, 28674), FALSE);
+
+    FormatDrive(hwndDlg, pContext);
+
+	/* Re-enable controls after format */
+    EnableWindow(GetDlgItem(hwndDlg, IDOK), TRUE);
+    EnableWindow(GetDlgItem(hwndDlg, IDCANCEL), TRUE);
+    EnableWindow(GetDlgItem(hwndDlg, 28673), TRUE);
+    EnableWindow(GetDlgItem(hwndDlg, 28677), TRUE);
+    EnableWindow(GetDlgItem(hwndDlg, 28680), TRUE);
+    EnableWindow(GetDlgItem(hwndDlg, 28679), TRUE);
+    EnableWindow(GetDlgItem(hwndDlg, 28674), TRUE);
+    EnableMenuItem(hSysMenu, SC_CLOSE, MF_BYCOMMAND | MF_ENABLED);
+    pContext->bFormattingNow = FALSE;
+
+    delete pParams;
+    return 0;
 }
 
 static INT_PTR CALLBACK
@@ -595,16 +635,39 @@ FormatDriveDlg(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 case IDOK:
                     pContext = (PFORMAT_DRIVE_CONTEXT)GetWindowLongPtr(hwndDlg, DWLP_USER);
-                    FormatDrive(hwndDlg, pContext);
+                    if (pContext->bFormattingNow)
+                        break;
+
+                    if (ShellMessageBoxW(shell32_hInstance, hwndDlg,
+                                         MAKEINTRESOURCEW(IDS_FORMAT_WARNING),
+                                         MAKEINTRESOURCEW(IDS_FORMAT_TITLE),
+                                         MB_OKCANCEL | MB_ICONWARNING) == IDOK)
+                    {
+                        pContext->bFormattingNow = TRUE;
+
+                        FORMAT_DRIVE_PARAMS *pParams = new FORMAT_DRIVE_PARAMS;
+                        pParams->hwndDlg = hwndDlg;
+                        pParams->pContext = pContext;
+
+                        unsigned tid;
+                        HANDLE hThread = (HANDLE)_beginthreadex(NULL, 0, DoFormatDrive, pParams, 0, &tid);
+                        CloseHandle(hThread);
+                    }
                     break;
                 case IDCANCEL:
                     pContext = (PFORMAT_DRIVE_CONTEXT)GetWindowLongPtr(hwndDlg, DWLP_USER);
+                    if (pContext->bFormattingNow)
+                        break;
+
                     EndDialog(hwndDlg, pContext->Result);
                     break;
                 case 28677: // filesystem combo
                     if (HIWORD(wParam) == CBN_SELENDOK)
                     {
                         pContext = (PFORMAT_DRIVE_CONTEXT)GetWindowLongPtr(hwndDlg, DWLP_USER);
+                        if (pContext->bFormattingNow)
+                            break;
+
                         InsertDefaultClusterSizeForFs(hwndDlg, pContext);
                     }
                     break;
@@ -628,10 +691,10 @@ SHFormatDrive(HWND hwnd, UINT drive, UINT fmtID, UINT options)
 
     Context.Drive = drive;
     Context.Options = options;
+    Context.Result = FALSE;
+    Context.bFormattingNow = FALSE;
 
     result = DialogBoxParamW(shell32_hInstance, MAKEINTRESOURCEW(IDD_FORMAT_DRIVE), hwnd, FormatDriveDlg, (LPARAM)&Context);
 
     return result;
 }
-
-

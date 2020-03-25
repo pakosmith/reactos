@@ -37,7 +37,7 @@ BEGIN
     POPUP "编辑(&E)"
     BEGIN
         MENUITEM "撤销(&U)\tCtrl+Z", IDM_EDITUNDO
-        MENUITEM "重做(&R)\tCtrl+Y", IDM_EDITREDO
+        MENUITEM "重来(&R)\tCtrl+Y", IDM_EDITREDO
         MENUITEM SEPARATOR
         MENUITEM "剪切(&T)\tCtrl+X", IDM_EDITCUT
         MENUITEM "复制(&C)\tCtrl+C", IDM_EDITCOPY
@@ -95,7 +95,7 @@ BEGIN
     BEGIN
         MENUITEM "帮助主题(&H)", IDM_HELPHELPTOPICS
         MENUITEM SEPARATOR
-        MENUITEM "信息(&I)", IDM_HELPINFO
+        MENUITEM "系统信息(&I)", IDM_HELPINFO
     END
 END
 
@@ -197,7 +197,7 @@ BEGIN
     IDS_PROGRAMNAME "画图"
     IDS_WINDOWTITLE "%s - 画图"
     IDS_INFOTITLE "ReactOS 画图"
-    IDS_INFOTEXT "ReactOS 画图是在 GNU LGPL 许可证下发布的 (详见 www.gnu.org)"
+    IDS_INFOTEXT "GNU LGPL 许可证下发布的 (详见 www.gnu.org)"
     IDS_SAVEPROMPTTEXT "您想把改变保存到 %s 吗？"
     IDS_DEFAULTFILENAME "未命名.bmp"
     IDS_MINIATURETITLE "缩略图"

@@ -66,17 +66,19 @@ LoadDialogResource(
 LPWORD
 AddDialogControl(
     IN HWND hwndDialog,
-    IN HWND * OutWnd,
+    OUT HWND *OutWnd,
     IN LPRECT DialogOffset,
     IN PDLGITEMTEMPLATE DialogItem,
     IN DWORD DialogIdMultiplier,
     IN HFONT hFont,
-    UINT xBaseUnit,
-    UINT yBaseUnit)
+    IN UINT xBaseUnit,
+    IN UINT yBaseUnit,
+    IN UINT MixerId)
 {
     RECT rect;
     LPWORD Offset;
-    LPWSTR ClassName, WindowName = NULL;
+    LPWSTR ClassName, WindowName;
+    WCHAR WindowIdBuf[sizeof("#65535")];
     HWND hwnd;
     DWORD wID;
     INT nSteps, i;
@@ -108,32 +110,42 @@ AddDialogControl(
         {
             case 0x80:
                 ClassName = L"button";
-                WindowName = (LPWSTR)(Offset + 1);
                 break ;
             case 0x82:
                 ClassName = L"static";
-                WindowName = (LPWSTR)(Offset + 1);
                 break;
             default:
                /* FIXME */
                assert(0);
                ClassName = NULL;
         }
+        Offset++;
     }
     else
     {
         /* class name is encoded as string */
-        ClassName = (LPWSTR)Offset;
+        ClassName = (LPWSTR)(Offset);
 
         /* move offset to the end of class string */
-        Offset += wcslen(ClassName);
-
-        /* get window name */
-        WindowName = (LPWSTR)(Offset + 1);
+        Offset += wcslen(ClassName) + 1;
     }
-    
-    /* move offset past class type/string */
-    Offset++;
+
+    if (*Offset == 0xFFFF)
+    {
+        /* Window name is encoded as ordinal */
+        Offset++;
+        wsprintf(WindowIdBuf, L"#%u", (DWORD)*Offset);
+        WindowName = WindowIdBuf;
+        Offset++;
+    }
+    else
+    {
+        /* window name is encoded as string */
+        WindowName = (LPWSTR)(Offset);
+
+        /* move offset to the end of class string */
+        Offset += wcslen(WindowName) + 1;
+    }
 
     if (DialogItem->id == MAXWORD)
     {
@@ -174,8 +186,11 @@ AddDialogControl(
         {
             /* Vertical trackbar: Volume */
 
+            /* Disable the volume trackbar by default */
+            EnableWindow(hwnd, FALSE);
+
             /* set up range */
-            SendMessage(hwnd, TBM_SETRANGE, (WPARAM)TRUE, (LPARAM)MAKELONG(0, VOLUME_STEPS));
+            SendMessage(hwnd, TBM_SETRANGE, (WPARAM)TRUE, (LPARAM)MAKELONG(VOLUME_MIN, VOLUME_MAX));
 
             /* set up page size */
             SendMessage(hwnd, TBM_SETPAGESIZE, 0, (LPARAM)VOLUME_PAGE_SIZE);
@@ -184,15 +199,18 @@ AddDialogControl(
             SendMessage(hwnd, TBM_SETPOS, (WPARAM)TRUE, (LPARAM)0);
 
             /* Calculate and set ticks */
-            nSteps = (VOLUME_STEPS / (VOLUME_TICKS + 1));
-            if (VOLUME_STEPS % (VOLUME_TICKS + 1) != 0)
+            nSteps = (VOLUME_MAX / (VOLUME_TICKS + 1));
+            if (VOLUME_MAX % (VOLUME_TICKS + 1) != 0)
                 nSteps++;
-            for (i = nSteps; i < VOLUME_STEPS; i += nSteps)
+            for (i = nSteps; i < VOLUME_MAX; i += nSteps)
                 SendMessage(hwnd, TBM_SETTIC, 0, (LPARAM)i);
         }
         else
         {
             /* Horizontal trackbar: Balance */
+
+            /* Disable the balance trackbar by default */
+            EnableWindow(hwnd, FALSE);
 
             /* set up range */
             SendMessage(hwnd, TBM_SETRANGE, (WPARAM)TRUE, (LPARAM)MAKELONG(0, BALANCE_STEPS));
@@ -211,19 +229,30 @@ AddDialogControl(
                 SendMessage(hwnd, TBM_SETTIC, 0, (LPARAM)i);
         }
     }
-    else if (!wcsicmp(ClassName, L"static") || !wcsicmp(ClassName, L"button"))
+    else if (!wcsicmp(ClassName, L"static"))
     {
-        /* set font */
+        /* Set font */
+        SendMessageW(hwnd, WM_SETFONT, (WPARAM)hFont, TRUE);
+    }
+    else if (!wcsicmp(ClassName, L"button"))
+    {
+        if (DialogItem->id == IDC_LINE_SWITCH)
+        {
+            if (MixerId == PLAY_MIXER)
+            {
+                /* Disable checkboxes by default, if we are in play mode */
+                EnableWindow(hwnd, FALSE);
+            }
+        }
+        else if (DialogItem->id == IDC_LINE_ADVANCED)
+        {
+            ShowWindow(hwnd, SW_HIDE);
+        }
+
+        /* Set font */
         SendMessageW(hwnd, WM_SETFONT, (WPARAM)hFont, TRUE);
     }
 
-    //ShowWindow(hwnd, SW_SHOWNORMAL);
-
-    if (WindowName != NULL)
-    {
-        /* move offset past window name */
-        Offset += wcslen(WindowName) + 1;
-    }
 
     /* check if there is additional data */
     if (*Offset == 0)
@@ -275,7 +304,15 @@ LoadDialogControls(
     for (Index = 0; Index < ItemCount; Index++)
     {
         /* add controls */
-        Offset = AddDialogControl(MixerWindow->hWnd, &MixerWindow->Window[MixerWindow->WindowCount], DialogOffset, DialogItem, DialogIdMultiplier, MixerWindow->hFont, xBaseUnit, yBaseUnit);
+        Offset = AddDialogControl(MixerWindow->hWnd,
+                                  &MixerWindow->Window[MixerWindow->WindowCount],
+                                  DialogOffset,
+                                  DialogItem,
+                                  DialogIdMultiplier,
+                                  MixerWindow->hFont,
+                                  xBaseUnit,
+                                  yBaseUnit,
+                                  MixerWindow->MixerId);
 
         /* sanity check */
         assert(Offset);
@@ -367,6 +404,9 @@ LoadDialog(
                 yBaseUnit = charSize.cy;
             }
             SelectObject(hDC, hOldFont);
+
+            MixerWindow->baseUnit.cx = charSize.cx;
+            MixerWindow->baseUnit.cy = charSize.cy;
         }
     }
 
@@ -414,33 +454,47 @@ EnumConnectionsCallback(
     UINT ControlCount = 0, Index;
     LPMIXERCONTROL Control = NULL;
     HWND hDlgCtrl;
+    PMIXERCONTROLDETAILS_UNSIGNED pVolumeDetails = NULL;
     PPREFERENCES_CONTEXT PrefContext = (PPREFERENCES_CONTEXT)Context;
 
-    if (Line->cControls != 0)
-    {
-      /* get line name */
-      if (SndMixerGetLineName(PrefContext->MixerWindow->Mixer, PrefContext->SelectedLine, LineName, MIXER_LONG_NAME_CHARS, TRUE) == -1)
-      {
-          /* failed to get line name */
-          LineName[0] = L'\0';
-      }
+    if (Line->cControls == 0)
+        return TRUE;
 
-      /* check if line is found in registry settings */
-      if (ReadLineConfig(PrefContext->DeviceName,
-                         LineName,
-                         Line->szName,
-                         &Flags))
-      {
+    /* get line name */
+    if (SndMixerGetLineName(PrefContext->MixerWindow->Mixer, PrefContext->SelectedLine, LineName, MIXER_LONG_NAME_CHARS, TRUE) == -1)
+    {
+        /* failed to get line name */
+        LineName[0] = L'\0';
+    }
+
+    pVolumeDetails = HeapAlloc(GetProcessHeap(),
+                               0,
+                               Line->cChannels * sizeof(MIXERCONTROLDETAILS_UNSIGNED));
+    if (pVolumeDetails == NULL)
+        goto done;
+
+    /* check if line is found in registry settings */
+    if (ReadLineConfig(PrefContext->DeviceName,
+                       LineName,
+                       Line->szName,
+                       &Flags))
+    {
           /* is it selected */
           if (Flags != 0x4)
           {
-              int dlgId = (PrefContext->MixerWindow->Mode == SMALL_MODE) ? IDD_SMALL_MASTER : IDD_NORMAL_MASTER;
+              int dlgId;
+
+              if ((Line->dwComponentType == MIXERLINE_COMPONENTTYPE_DST_SPEAKERS) ||
+                  (Line->dwComponentType == MIXERLINE_COMPONENTTYPE_DST_HEADPHONES))
+                  dlgId = (PrefContext->MixerWindow->Mode == SMALL_MODE) ? IDD_SMALL_MASTER : IDD_NORMAL_MASTER;
+              else
+                  dlgId = (PrefContext->MixerWindow->Mode == SMALL_MODE) ? IDD_SMALL_LINE : IDD_NORMAL_LINE;
 
               /* load dialog resource */
-              LoadDialog(hAppInstance, PrefContext->MixerWindow, MAKEINTRESOURCE(dlgId), PrefContext->Count);
+              LoadDialog(hAppInstance, PrefContext->MixerWindow, MAKEINTRESOURCE(dlgId), PrefContext->MixerWindow->DialogCount);
 
               /* get id */
-              wID = (PrefContext->Count + 1) * IDC_LINE_NAME;
+              wID = (PrefContext->MixerWindow->DialogCount + 1) * IDC_LINE_NAME;
 
               /* set line name */
               SetDlgItemTextW(PrefContext->MixerWindow->hWnd, wID, Line->szName);
@@ -449,23 +503,27 @@ EnumConnectionsCallback(
               if (SndMixerQueryControls(Mixer, &ControlCount, Line, &Control) != FALSE)
               {
                   /* now go through all controls and update their states */
-                  for(Index = 0; Index < Line->cControls; Index++)
+                  for (Index = 0; Index < Line->cControls; Index++)
                   {
-                      if ((Control[Index].dwControlType & MIXERCONTROL_CT_CLASS_MASK) == MIXERCONTROL_CT_CLASS_SWITCH)
+                      if (Control[Index].dwControlType == MIXERCONTROL_CONTROLTYPE_MUTE)
                       {
                           MIXERCONTROLDETAILS_BOOLEAN Details;
 
                           /* get volume control details */
-                          if (SndMixerGetVolumeControlDetails(Mixer, Control[Index].dwControlID, sizeof(MIXERCONTROLDETAILS_BOOLEAN), (LPVOID)&Details) != -1)
+                          if (SndMixerGetVolumeControlDetails(Mixer, Control[Index].dwControlID, 1, sizeof(MIXERCONTROLDETAILS_BOOLEAN), (LPVOID)&Details) != -1)
                           {
                               /* update dialog control */
-                              wID = (PrefContext->Count + 1) * IDC_LINE_SWITCH;
+                              wID = (PrefContext->MixerWindow->DialogCount + 1) * IDC_LINE_SWITCH;
 
                               /* get dialog control */
                               hDlgCtrl = GetDlgItem(PrefContext->MixerWindow->hWnd, wID);
 
                               if (hDlgCtrl != NULL)
                               {
+                                  /* Enable the 'Mute' checkbox, if we are in play mode */
+                                  if (Mixer->MixerId == PLAY_MIXER)
+                                      EnableWindow(hDlgCtrl, TRUE);
+
                                   /* check state */
                                   if (SendMessageW(hDlgCtrl, BM_GETCHECK, 0, 0) != Details.fValue)
                                   {
@@ -475,22 +533,63 @@ EnumConnectionsCallback(
                               }
                           }
                       }
-                      else if ((Control[Index].dwControlType & MIXERCONTROL_CT_CLASS_MASK) == MIXERCONTROL_CT_CLASS_FADER)
+                      else if (Control[Index].dwControlType == MIXERCONTROL_CONTROLTYPE_VOLUME)
                       {
-                          MIXERCONTROLDETAILS_UNSIGNED Details;
-
                           /* get volume control details */
-                          if (SndMixerGetVolumeControlDetails(Mixer, Control[Index].dwControlID, sizeof(MIXERCONTROLDETAILS_UNSIGNED), (LPVOID)&Details) != -1)
+                          if (SndMixerGetVolumeControlDetails(Mixer, Control[Index].dwControlID, Line->cChannels, sizeof(MIXERCONTROLDETAILS_UNSIGNED), (LPVOID)pVolumeDetails) != -1)
                           {
                               /* update dialog control */
-                              DWORD Position;
-                              DWORD Step = 0x10000 / VOLUME_STEPS;
+                              DWORD volumePosition, volumeStep, maxVolume, i;
+                              DWORD balancePosition, balanceStep;
 
-                              /* FIXME: give me granularity */
-                              Position = VOLUME_STEPS - (Details.dwValue / Step);
+                              volumeStep = (Control[Index].Bounds.dwMaximum - Control[Index].Bounds.dwMinimum) / (VOLUME_MAX - VOLUME_MIN);
 
-                              /* FIXME support left - right slider */
-                              wID = (PrefContext->Count + 1) * IDC_LINE_SLIDER_VERT;
+                              maxVolume = 0;
+                              for (i = 0; i < Line->cChannels; i++)
+                              {
+                                  if (pVolumeDetails[i].dwValue > maxVolume)
+                                      maxVolume = pVolumeDetails[i].dwValue;
+                              }
+
+                              volumePosition = (maxVolume - Control[Index].Bounds.dwMinimum) / volumeStep;
+
+                              if (Line->cChannels == 1)
+                              {
+                                  balancePosition = BALANCE_CENTER;
+                              }
+                              else if (Line->cChannels == 2)
+                              {
+                                  if (pVolumeDetails[0].dwValue == pVolumeDetails[1].dwValue)
+                                  {
+                                      balancePosition = BALANCE_CENTER;
+                                  }
+                                  else if (pVolumeDetails[0].dwValue == Control[Index].Bounds.dwMinimum)
+                                  {
+                                      balancePosition = BALANCE_RIGHT;
+                                  }
+                                  else if (pVolumeDetails[1].dwValue == Control[Index].Bounds.dwMinimum)
+                                  {
+                                      balancePosition = BALANCE_LEFT;
+                                  }
+                                  else
+                                  {
+                                      balanceStep = (maxVolume - Control[Index].Bounds.dwMinimum) / (BALANCE_STEPS / 2);
+
+                                      if (pVolumeDetails[0].dwValue < pVolumeDetails[1].dwValue)
+                                      {
+                                          balancePosition = (pVolumeDetails[0].dwValue - Control[Index].Bounds.dwMinimum) / balanceStep;
+                                          balancePosition = BALANCE_RIGHT - balancePosition;
+                                      }
+                                      else if (pVolumeDetails[1].dwValue < pVolumeDetails[0].dwValue)
+                                      {
+                                          balancePosition = (pVolumeDetails[1].dwValue - Control[Index].Bounds.dwMinimum) / balanceStep;
+                                          balancePosition = BALANCE_LEFT + balancePosition;
+                                      }
+                                  }
+                              }
+
+                              /* Set the volume trackbar */
+                              wID = (PrefContext->MixerWindow->DialogCount + 1) * IDC_LINE_SLIDER_VERT;
 
                               /* get dialog control */
                               hDlgCtrl = GetDlgItem(PrefContext->MixerWindow->hWnd, wID);
@@ -499,11 +598,56 @@ EnumConnectionsCallback(
                               {
                                   /* check state */
                                   LRESULT OldPosition = SendMessageW(hDlgCtrl, TBM_GETPOS, 0, 0);
-                                  if (OldPosition != Position)
+
+                                  /* Enable the volume trackbar */
+                                  EnableWindow(hDlgCtrl, TRUE);
+
+                                  if (OldPosition != (VOLUME_MAX - volumePosition))
                                   {
                                       /* update control state */
-                                      SendMessageW(hDlgCtrl, TBM_SETPOS, (WPARAM)TRUE, Position + Index);
+                                      SendMessageW(hDlgCtrl, TBM_SETPOS, (WPARAM)TRUE, VOLUME_MAX - volumePosition);
                                   }
+                              }
+
+                              if (Line->cChannels == 2)
+                              {
+                                  /* Set the balance trackbar */
+                                  wID = (PrefContext->MixerWindow->DialogCount + 1) * IDC_LINE_SLIDER_HORZ;
+
+                                  /* get dialog control */
+                                  hDlgCtrl = GetDlgItem(PrefContext->MixerWindow->hWnd, wID);
+
+                                  if (hDlgCtrl != NULL)
+                                  {
+                                      /* check state */
+                                      LRESULT OldPosition = SendMessageW(hDlgCtrl, TBM_GETPOS, 0, 0);
+
+                                      /* Enable the balance trackbar */
+                                      EnableWindow(hDlgCtrl, TRUE);
+
+                                      if (OldPosition != balancePosition)
+                                      {
+                                          /* update control state */
+                                          SendMessageW(hDlgCtrl, TBM_SETPOS, (WPARAM)TRUE, balancePosition);
+                                      }
+                                  }
+                              }
+                          }
+                      }
+                      else
+                      {
+                          if (PrefContext->MixerWindow->Mode == NORMAL_MODE)
+                          {
+                              PrefContext->MixerWindow->bHasExtendedControls = TRUE;
+
+                              wID = (PrefContext->MixerWindow->DialogCount + 1) * IDC_LINE_ADVANCED;
+
+                              /* get dialog control */
+                              hDlgCtrl = GetDlgItem(PrefContext->MixerWindow->hWnd, wID);
+                              if (hDlgCtrl != NULL)
+                              {
+                                  ShowWindow(hDlgCtrl,
+                                             PrefContext->MixerWindow->bShowExtendedControls ? SW_SHOWNORMAL : SW_HIDE);
                               }
                           }
                       }
@@ -514,10 +658,15 @@ EnumConnectionsCallback(
               }
 
               /* increment dialog count */
-              PrefContext->Count++;
+              PrefContext->MixerWindow->DialogCount++;
           }
-      }
     }
+
+done:
+    /* Free the volume details */
+    if (pVolumeDetails)
+        HeapFree(GetProcessHeap(), 0, pVolumeDetails);
+
     return TRUE;
 }
 
@@ -525,33 +674,91 @@ VOID
 LoadDialogCtrls(
     PPREFERENCES_CONTEXT PrefContext)
 {
+    WCHAR szBuffer[64];
     HWND hDlgCtrl;
     RECT statusRect;
+    UINT i;
+    LONG dy;
 
     /* set dialog count to zero */
-    PrefContext->Count = 0;
-
+    PrefContext->MixerWindow->DialogCount = 0;
+    PrefContext->MixerWindow->bHasExtendedControls = FALSE;
     SetRectEmpty(&PrefContext->MixerWindow->rect);
 
     /* enumerate controls */
     SndMixerEnumConnections(PrefContext->MixerWindow->Mixer, PrefContext->SelectedLine, EnumConnectionsCallback, (PVOID)PrefContext);
 
+    /* Update the 'Advanced Controls' menu item */
+    EnableMenuItem(GetMenu(PrefContext->MixerWindow->hWnd),
+                   IDM_ADVANCED_CONTROLS,
+                   MF_BYCOMMAND | (PrefContext->MixerWindow->bHasExtendedControls ? MF_ENABLED : MF_GRAYED));
+
+    /* Add some height for the status bar */
     if (PrefContext->MixerWindow->hStatusBar)
     {
         GetWindowRect(PrefContext->MixerWindow->hStatusBar, &statusRect);
         PrefContext->MixerWindow->rect.bottom += (statusRect.bottom - statusRect.top);
     }
 
+    /* Add height of the 'Advanced' button */
+    dy = MulDiv(ADVANCED_BUTTON_HEIGHT, PrefContext->MixerWindow->baseUnit.cy, 8);
+    if (PrefContext->MixerWindow->bShowExtendedControls && PrefContext->MixerWindow->bHasExtendedControls)
+        PrefContext->MixerWindow->rect.bottom += dy;
+
     /* now move the window */
     AdjustWindowRect(&PrefContext->MixerWindow->rect, WS_DLGFRAME | WS_CAPTION | WS_MINIMIZEBOX | WS_SYSMENU | WS_CLIPCHILDREN | WS_CLIPSIBLINGS | WS_VISIBLE, TRUE);
     SetWindowPos(PrefContext->MixerWindow->hWnd, HWND_TOP, PrefContext->MixerWindow->rect.left, PrefContext->MixerWindow->rect.top, PrefContext->MixerWindow->rect.right - PrefContext->MixerWindow->rect.left, PrefContext->MixerWindow->rect.bottom - PrefContext->MixerWindow->rect.top, SWP_NOMOVE | SWP_NOZORDER);
 
-    /* get last line separator */
-    hDlgCtrl = GetDlgItem(PrefContext->MixerWindow->hWnd, IDC_LINE_SEP * PrefContext->Count);
+    /* Move the status bar */
+    if (PrefContext->MixerWindow->hStatusBar)
+    {
+        SetWindowPos(PrefContext->MixerWindow->hStatusBar,
+                     HWND_TOP,
+                     statusRect.left,
+                     PrefContext->MixerWindow->rect.bottom - (statusRect.bottom - statusRect.top),
+                     PrefContext->MixerWindow->rect.right - PrefContext->MixerWindow->rect.left,
+                     statusRect.bottom - statusRect.top,
+                     SWP_NOZORDER);
+    }
 
+    if (PrefContext->MixerWindow->MixerId == RECORD_MIXER)
+        LoadStringW(hAppInstance, IDS_SELECT, szBuffer, ARRAYSIZE(szBuffer));
+
+    for (i = 0; i < PrefContext->MixerWindow->DialogCount; i++)
+    {
+        if (PrefContext->MixerWindow->MixerId == RECORD_MIXER)
+        {
+            hDlgCtrl = GetDlgItem(PrefContext->MixerWindow->hWnd, (i + 1) * IDC_LINE_SWITCH);
+
+            /* Turn the autocheckbox into a checkbox */
+            SetWindowLongPtr(hDlgCtrl, GWL_STYLE, (GetWindowLongPtr(hDlgCtrl, GWL_STYLE) & ~BS_AUTOCHECKBOX) | BS_CHECKBOX);
+
+            /* Change text from 'Mute' to 'Select' */
+            SetWindowTextW(hDlgCtrl, szBuffer);
+        }
+
+        /* Resize the vertical line separator */
+        hDlgCtrl = GetDlgItem(PrefContext->MixerWindow->hWnd, (i + 1) * IDC_LINE_SEP);
+        if (hDlgCtrl != NULL)
+        {
+            GetWindowRect(hDlgCtrl, &statusRect);
+            if (PrefContext->MixerWindow->bShowExtendedControls && PrefContext->MixerWindow->bHasExtendedControls)
+                statusRect.bottom += dy;
+
+            SetWindowPos(hDlgCtrl,
+                         HWND_TOP,
+                         0,
+                         0,
+                         statusRect.right - statusRect.left,
+                         statusRect.bottom - statusRect.top,
+                         SWP_NOMOVE | SWP_NOZORDER);
+        }
+    }
+
+    /* Hide the last line separator */
+    hDlgCtrl = GetDlgItem(PrefContext->MixerWindow->hWnd, IDC_LINE_SEP * PrefContext->MixerWindow->DialogCount);
     if (hDlgCtrl != NULL)
     {
-        /* hide last separator */
         ShowWindow(hDlgCtrl, SW_HIDE);
     }
 }
@@ -568,7 +775,7 @@ UpdateDialogLineSwitchControl(
     WCHAR LineName[MIXER_LONG_NAME_CHARS];
 
     /* find the index of this line */
-    for(Index = 0; Index < PrefContext->Count; Index++)
+    for (Index = 0; Index < PrefContext->MixerWindow->DialogCount; Index++)
     {
         /* get id */
         wID = (Index + 1) * IDC_LINE_NAME;
@@ -606,7 +813,6 @@ VOID
 UpdateDialogLineSliderControl(
     PPREFERENCES_CONTEXT PrefContext,
     LPMIXERLINE Line,
-    DWORD dwControlID,
     DWORD dwDialogID,
     DWORD Position)
 {
@@ -616,7 +822,7 @@ UpdateDialogLineSliderControl(
     WCHAR LineName[MIXER_LONG_NAME_CHARS];
 
     /* find the index of this line */
-    for(Index = 0; Index < PrefContext->Count; Index++)
+    for (Index = 0; Index < PrefContext->MixerWindow->DialogCount; Index++)
     {
         /* get id */
         wID = (Index + 1) * IDC_LINE_NAME;
@@ -643,7 +849,7 @@ UpdateDialogLineSliderControl(
                 if (OldPosition != Position)
                 {
                     /* update control state */
-                    SendMessageW(hDlgCtrl, TBM_SETPOS, (WPARAM)TRUE, Position + Index);
+                    SendMessageW(hDlgCtrl, TBM_SETPOS, (WPARAM)TRUE, Position);
                 }
             }
             break;

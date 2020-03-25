@@ -196,6 +196,16 @@ CheckUnattendedSetup(
        }
     }
 
+    /* Search for FsType in the 'Unattend' section */
+    pSetupData->FsType = 0;
+    if (SpInfFindFirstLine(UnattendInf, L"Unattend", L"FsType", &Context))
+    {
+        if (SpInfGetIntField(&Context, 1, &IntValue))
+        {
+            pSetupData->FsType = IntValue;
+        }
+    }
+
 Quit:
     SpInfCloseInfFile(UnattendInf);
 }
@@ -614,22 +624,35 @@ NTSTATUS
 InitDestinationPaths(
     IN OUT PUSETUP_DATA pSetupData,
     IN PCWSTR InstallationDir,
-    IN PDISKENTRY DiskEntry,    // FIXME: HACK!
     IN PPARTENTRY PartEntry)    // FIXME: HACK!
 {
+    NTSTATUS Status;
+    PDISKENTRY DiskEntry = PartEntry->DiskEntry;
     WCHAR PathBuffer[MAX_PATH];
 
-    //
-    // TODO: Check return status values of the functions!
-    //
+    ASSERT(PartEntry->IsPartitioned && PartEntry->PartitionNumber != 0);
 
     /* Create 'pSetupData->DestinationRootPath' string */
     RtlFreeUnicodeString(&pSetupData->DestinationRootPath);
-    RtlStringCchPrintfW(PathBuffer, ARRAYSIZE(PathBuffer),
-            L"\\Device\\Harddisk%lu\\Partition%lu\\",
-            DiskEntry->DiskNumber,
-            PartEntry->PartitionNumber);
-    RtlCreateUnicodeString(&pSetupData->DestinationRootPath, PathBuffer);
+    Status = RtlStringCchPrintfW(PathBuffer, ARRAYSIZE(PathBuffer),
+                     L"\\Device\\Harddisk%lu\\Partition%lu\\",
+                     DiskEntry->DiskNumber,
+                     PartEntry->PartitionNumber);
+
+    if (!NT_SUCCESS(Status))
+    {
+        DPRINT1("RtlStringCchPrintfW() failed with status 0x%08lx\n", Status);
+        return Status;
+    }
+
+    Status = RtlCreateUnicodeString(&pSetupData->DestinationRootPath, PathBuffer) ? STATUS_SUCCESS : STATUS_NO_MEMORY;
+
+    if (!NT_SUCCESS(Status))
+    {
+        DPRINT1("RtlCreateUnicodeString() failed with status 0x%08lx\n", Status);
+        return Status;
+    }
+
     DPRINT("DestinationRootPath: %wZ\n", &pSetupData->DestinationRootPath);
 
     // FIXME! Which variable to choose?
@@ -639,23 +662,116 @@ InitDestinationPaths(
 /** Equivalent of 'NTOS_INSTALLATION::SystemArcPath' **/
     /* Create 'pSetupData->DestinationArcPath' */
     RtlFreeUnicodeString(&pSetupData->DestinationArcPath);
-    RtlStringCchPrintfW(PathBuffer, ARRAYSIZE(PathBuffer),
-            L"multi(0)disk(0)rdisk(%lu)partition(%lu)\\",
-            DiskEntry->BiosDiskNumber,
-            PartEntry->PartitionNumber);
-    ConcatPaths(PathBuffer, ARRAYSIZE(PathBuffer), 1, InstallationDir);
-    RtlCreateUnicodeString(&pSetupData->DestinationArcPath, PathBuffer);
+
+    if (DiskEntry->MediaType == FixedMedia)
+    {
+        if (DiskEntry->BiosFound)
+        {
+#if 1
+            Status = RtlStringCchPrintfW(PathBuffer, ARRAYSIZE(PathBuffer),
+                             L"multi(0)disk(0)rdisk(%lu)partition(%lu)\\",
+                             DiskEntry->HwFixedDiskNumber,
+                             PartEntry->OnDiskPartitionNumber);
+#else
+            Status = RtlStringCchPrintfW(PathBuffer, ARRAYSIZE(PathBuffer),
+                             L"multi(%lu)disk(%lu)rdisk(%lu)partition(%lu)\\",
+                             DiskEntry->HwAdapterNumber,
+                             DiskEntry->HwControllerNumber,
+                             DiskEntry->HwFixedDiskNumber,
+                             PartEntry->OnDiskPartitionNumber);
+#endif
+            DPRINT1("Fixed disk found by BIOS, using MULTI ARC path '%S'\n", PathBuffer);
+        }
+        else
+        {
+            Status = RtlStringCchPrintfW(PathBuffer, ARRAYSIZE(PathBuffer),
+                             L"scsi(%u)disk(%u)rdisk(%u)partition(%lu)\\",
+                             DiskEntry->Port,
+                             DiskEntry->Bus,
+                             DiskEntry->Id,
+                             PartEntry->OnDiskPartitionNumber);
+            DPRINT1("Fixed disk not found by BIOS, using SCSI ARC path '%S'\n", PathBuffer);
+        }
+    }
+    else // if (DiskEntry->MediaType == RemovableMedia)
+    {
+#if 1
+        Status = RtlStringCchPrintfW(PathBuffer, ARRAYSIZE(PathBuffer),
+                         L"multi(0)disk(0)rdisk(%lu)partition(%lu)\\",
+                         0, 1);
+        DPRINT1("Removable disk, using MULTI ARC path '%S'\n", PathBuffer);
+#else
+        Status = RtlStringCchPrintfW(PathBuffer, ARRAYSIZE(PathBuffer),
+                         L"signature(%08x)disk(%u)rdisk(%u)partition(%lu)\\",
+                         DiskEntry->LayoutBuffer->Signature,
+                         DiskEntry->Bus,
+                         DiskEntry->Id,
+                         PartEntry->OnDiskPartitionNumber);
+        DPRINT1("Removable disk, using SIGNATURE ARC path '%S'\n", PathBuffer);
+#endif
+    }
+
+    if (!NT_SUCCESS(Status))
+    {
+        DPRINT1("RtlStringCchPrintfW() failed with status 0x%08lx\n", Status);
+        RtlFreeUnicodeString(&pSetupData->DestinationRootPath);
+        return Status;
+    }
+
+    Status = ConcatPaths(PathBuffer, ARRAYSIZE(PathBuffer), 1, InstallationDir);
+
+    if (!NT_SUCCESS(Status))
+    {
+        DPRINT1("ConcatPaths() failed with status 0x%08lx\n", Status);
+        RtlFreeUnicodeString(&pSetupData->DestinationRootPath);
+        return Status;
+    }
+
+    Status = RtlCreateUnicodeString(&pSetupData->DestinationArcPath, PathBuffer) ? STATUS_SUCCESS : STATUS_NO_MEMORY;
+
+    if (!NT_SUCCESS(Status))
+    {
+        DPRINT1("RtlCreateUnicodeString() failed with status 0x%08lx\n", Status);
+        RtlFreeUnicodeString(&pSetupData->DestinationRootPath);
+        return Status;
+    }
 
 /** Equivalent of 'NTOS_INSTALLATION::SystemNtPath' **/
     /* Create 'pSetupData->DestinationPath' string */
     RtlFreeUnicodeString(&pSetupData->DestinationPath);
-    CombinePaths(PathBuffer, ARRAYSIZE(PathBuffer), 2,
-                 pSetupData->DestinationRootPath.Buffer, InstallationDir);
-    RtlCreateUnicodeString(&pSetupData->DestinationPath, PathBuffer);
+    Status = CombinePaths(PathBuffer, ARRAYSIZE(PathBuffer), 2,
+                          pSetupData->DestinationRootPath.Buffer, InstallationDir);
+
+    if (!NT_SUCCESS(Status))
+    {
+        DPRINT1("CombinePaths() failed with status 0x%08lx\n", Status);
+        RtlFreeUnicodeString(&pSetupData->DestinationArcPath);
+        RtlFreeUnicodeString(&pSetupData->DestinationRootPath);
+        return Status;
+    }
+
+    Status = RtlCreateUnicodeString(&pSetupData->DestinationPath, PathBuffer) ? STATUS_SUCCESS : STATUS_NO_MEMORY;
+
+    if (!NT_SUCCESS(Status))
+    {
+        DPRINT1("RtlCreateUnicodeString() failed with status 0x%08lx\n", Status);
+        RtlFreeUnicodeString(&pSetupData->DestinationArcPath);
+        RtlFreeUnicodeString(&pSetupData->DestinationRootPath);
+        return Status;
+    }
 
 /** Equivalent of 'NTOS_INSTALLATION::PathComponent' **/
     // FIXME: This is only temporary!! Must be removed later!
-    /***/RtlCreateUnicodeString(&pSetupData->InstallPath, InstallationDir);/***/
+    Status = RtlCreateUnicodeString(&pSetupData->InstallPath, InstallationDir) ? STATUS_SUCCESS : STATUS_NO_MEMORY;
+
+    if (!NT_SUCCESS(Status))
+    {
+        DPRINT1("RtlCreateUnicodeString() failed with status 0x%08lx\n", Status);
+        RtlFreeUnicodeString(&pSetupData->DestinationPath);
+        RtlFreeUnicodeString(&pSetupData->DestinationArcPath);
+        RtlFreeUnicodeString(&pSetupData->DestinationRootPath);
+        return Status;
+    }
 
     return STATUS_SUCCESS;
 }
@@ -801,7 +917,8 @@ UpdateRegistry(
     /**/IN PPARTLIST PartitionList,      /* HACK HACK! */
     /**/IN WCHAR DestinationDriveLetter, /* HACK HACK! */
     /**/IN PCWSTR SelectedLanguageId,    /* HACK HACK! */
-    IN PREGISTRY_STATUS_ROUTINE StatusRoutine OPTIONAL)
+    IN PREGISTRY_STATUS_ROUTINE StatusRoutine OPTIONAL,
+    IN PFONTSUBSTSETTINGS SubstSettings OPTIONAL)
 {
     ERROR_NUMBER ErrorNumber;
     NTSTATUS Status;
@@ -996,6 +1113,14 @@ DoUpdate:
         // FIXME: This should technically be done by mountmgr (if AutoMount is enabled)!
         SetMountedDeviceValues(PartitionList);
     }
+
+#ifdef __REACTOS__
+    if (SubstSettings)
+    {
+        /* HACK */
+        DoRegistryFontFixup(SubstSettings, wcstoul(SelectedLanguageId, NULL, 16));
+    }
+#endif
 
 Cleanup:
     //

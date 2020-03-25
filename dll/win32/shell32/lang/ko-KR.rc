@@ -66,6 +66,7 @@ BEGIN
         MENUITEM SEPARATOR
         MENUITEM "C&ut", IDM_CUT
         MENUITEM "&Copy", IDM_COPY
+        MENUITEM "Paste", IDM_INSERT
         MENUITEM SEPARATOR
         MENUITEM "Create &Link", IDM_CREATELINK
         MENUITEM "&Delete", IDM_DELETE
@@ -94,7 +95,7 @@ FONT 9, "굴림"
 BEGIN
     DEFPUSHBUTTON "OK", 1, 60, 175, 60, 15, BS_DEFPUSHBUTTON | WS_GROUP | WS_TABSTOP
     PUSHBUTTON "Cancel", 2, 125, 175, 60, 15, WS_GROUP | WS_TABSTOP
-    LTEXT "", IDC_BROWSE_FOR_FOLDER_TITLE, 4, 4, 180, 12
+    LTEXT "", IDC_BROWSE_FOR_FOLDER_TITLE, 4, 4, 180, 24
     LTEXT "", IDC_BROWSE_FOR_FOLDER_STATUS, 4, 25, 180, 12
     CONTROL "", IDC_BROWSE_FOR_FOLDER_TREEVIEW, "SysTreeView32", TVS_HASBUTTONS | TVS_HASLINES | TVS_LINESATROOT | WS_BORDER | WS_TABSTOP, 4, 40, 180, 120
 END
@@ -134,11 +135,7 @@ FONT 9, "굴림"
 BEGIN
     ICON "", IDC_ABOUT_ICON, 7, 55, 21, 20
     LTEXT "", IDC_ABOUT_APPNAME, 35, 55, 200, 10
-    LTEXT "Version ", IDC_STATIC, 35, 65, 28, 10
-    LTEXT KERNEL_VERSION_STR, IDC_STATIC, 63, 65, 27, 10
-    LTEXT " (", IDC_STATIC, 90, 65, 5, 10
-    LTEXT KERNEL_VERSION_BUILD_STR, IDC_STATIC, 95, 65, 58, 10
-    LTEXT ")", IDC_STATIC, 153, 65, 5, 10
+    LTEXT "", IDC_ABOUT_VERSION, 35, 65, 250, 10
     LTEXT "Copyright 1998-", IDC_STATIC, 35, 75, 53, 10
     LTEXT COPYRIGHT_YEAR, IDC_STATIC, 88, 75, 17, 10
     LTEXT " ReactOS Team\0", IDC_STATIC, 105, 75, 53, 10
@@ -167,7 +164,7 @@ CAPTION "Run"
 FONT 9, "굴림"
 BEGIN
     ICON "", IDC_RUNDLG_ICON, 7, 11, 18, 20, WS_VISIBLE
-    LTEXT "Type the name of a program, folder, document, or Internet resource, and ReactOS will open it for you.", 12289, 36, 11, 182, 18
+    LTEXT "Type the name of a program, folder, document, or Internet resource, and ReactOS will open it for you.", 12289, 36, 11, 185, 18
     LTEXT "&Open:", 12305, 7, 39, 24, 10
     CONTROL "", IDC_RUNDLG_EDITPATH, "COMBOBOX", WS_TABSTOP | WS_GROUP | WS_VSCROLL | WS_VISIBLE | CBS_AUTOHSCROLL | CBS_DROPDOWN, 36, 37, 184, 100
     DEFPUSHBUTTON "OK", IDOK, 36, 70, 59, 14, WS_TABSTOP
@@ -213,8 +210,8 @@ BEGIN
     CHECKBOX "Run with different credentials", IDC_SHORTEX_RUN_DIFFERENT, 25, 50, 150, 10
     LTEXT "This option can allow you to run the this shortcut as another user, or continue as yourself while protecting your computer and data from unauthorized program activity.", -1, 50, 60, 175, 40
     CHECKBOX "Run in seperate memory space", IDC_SHORTEX_RUN_SEPARATE, 25, 100, 150, 10, WS_DISABLED
-    PUSHBUTTON "OK", 1, 63, 124, 50, 15, WS_VISIBLE
-    PUSHBUTTON "Abort", 2, 120, 124, 50, 15, WS_VISIBLE
+    PUSHBUTTON "OK", IDOK, 63, 124, 50, 15, WS_VISIBLE
+    PUSHBUTTON "Abort", IDCANCEL, 120, 124, 50, 15, WS_VISIBLE
 END
 
 IDD_FOLDER_PROPERTIES DIALOGEX 0, 0, 240, 205
@@ -259,7 +256,7 @@ BEGIN
     LTEXT "Opens with:", 14006, 8, 53, 50, 10
     ICON "", 14025, 58, 52, 11, 10, NOT WS_VISIBLE
     PUSHBUTTON "&Change...", 14024, 168, 50, 60, 14, WS_CHILD | WS_VISIBLE | WS_TABSTOP
-    EDITTEXT 14007, 58, 53, 170, 10, ES_LEFT | ES_READONLY | NOT WS_BORDER | ES_AUTOHSCROLL | NOT WS_TABSTOP
+    EDITTEXT 14007, 58, 53, 100, 10, ES_LEFT | ES_READONLY | NOT WS_BORDER | ES_AUTOHSCROLL | NOT WS_TABSTOP
     LTEXT "", -1, 8, 68, 221, 1, SS_ETCHEDHORZ | WS_CHILD | WS_VISIBLE
     LTEXT "Location:", 14008, 8, 75, 45, 10
     EDITTEXT 14009, 58, 75, 170, 10, ES_LEFT | ES_READONLY | NOT WS_BORDER | ES_AUTOHSCROLL | NOT WS_TABSTOP
@@ -384,7 +381,7 @@ STYLE DS_SHELLFONT | WS_CHILD | WS_DISABLED | WS_CAPTION
 CAPTION "Recycle Bin Properties"
 FONT 9, "굴림", 0, 0, 0x0
 BEGIN
-    CONTROL "", 14000, "SysListView32", LVS_REPORT | LVS_SHAREIMAGELISTS | WS_BORDER | WS_TABSTOP, 10, 10, 220, 50
+    CONTROL "", 14000, "SysListView32", LVS_REPORT | LVS_SHOWSELALWAYS | LVS_SHAREIMAGELISTS | WS_BORDER | WS_TABSTOP, 10, 10, 220, 50
     GROUPBOX "Settings for selected location", -1, 10, 72, 220, 70
     RADIOBUTTON "&Custom size:", 14001, 20, 90, 80, 10, WS_TABSTOP
     EDITTEXT 14002, 106, 87, 50, 14, WS_TABSTOP | ES_NUMBER
@@ -750,6 +747,9 @@ BEGIN
     IDS_FONTS_DESCRIPTION "Add, change, and manage fonts on your computer."
     IDS_PRINTERS_DESCRIPTION "Shows installed printers and fax printers and helps you add new ones."
 
+    /* About shell dialog version string */
+    IDS_ABOUT_VERSION_STRING "Version %S (%S)"
+
     /* context menus */
     IDS_VIEW_LARGE "Lar&ge Icons"
     IDS_VIEW_SMALL "S&mall Icons"
@@ -768,6 +768,17 @@ BEGIN
     IDS_PASTE "Paste"
     IDS_EJECT "Eject"
     IDS_DISCONNECT "Disconnect"
+    IDS_OPENFILELOCATION "Open f&ile location"
+    IDS_DESKLINK "Desktop (Create shortcut)"
+    IDS_SENDTO_MENU "Se&nd To"
+
+    IDS_MOVEERRORTITLE "Error Moving File or Folder"
+    IDS_COPYERRORTITLE "Error Copying File or Folder"
+    IDS_MOVEERRORSAMEFOLDER "Cannot move '%s': The destination folder is the same as the source folder."
+    IDS_MOVEERRORSAME "Cannot move '%s': The source and destination file names are the same."
+    IDS_COPYERRORSAME "Cannot copy '%s': The source and destination file names are the same."
+    IDS_MOVEERRORSUBFOLDER "Cannot move '%s': The destination folder is a subfolder of the source folder."
+    IDS_COPYERRORSUBFOLDER "Cannot copy '%s': The destination folder is a subfolder of the source folder."
 
     IDS_CREATEFOLDER_DENIED "Unable to create the folder '%1'"
     IDS_CREATEFOLDER_CAPTION "Unable to create folder"
@@ -777,7 +788,7 @@ BEGIN
     IDS_DELETEMULTIPLE_TEXT "Are you sure you want to delete these %1 items?"
     IDS_DELETESELECTED_TEXT "Are you sure you want to delete the selected item(s)?"
     IDS_TRASHITEM_TEXT "Are you sure that you want to send '%1' to the Recycle Bin?"
-    IDS_TRASHFOLDER_TEXT "Are you sure that you want to send '%1' and all its content to the Recycle Bin?"
+    IDS_TRASHFOLDER_TEXT "Are you sure that you want to send '%1' and all its contents to the Recycle Bin?"
     IDS_TRASHMULTIPLE_TEXT "Are you sure that you want to send these %1 items to the Recycle Bin?"
     IDS_CANTTRASH_TEXT "The item '%1' can't be sent to Recycle Bin. Do you want to delete it instead?"
     IDS_OVERWRITEFILE_TEXT "This folder already contains a file called '%1'.\n\nDo you want to replace it?"
@@ -796,6 +807,11 @@ BEGIN
     IDS_RESTART_PROMPT "Do you want to restart the system?"
     IDS_SHUTDOWN_TITLE "Shutdown"
     IDS_SHUTDOWN_PROMPT "Do you want to shutdown?"
+    
+    /* Format Dialog Strings */
+    IDS_FORMAT_TITLE "Format Local Disk"
+    IDS_FORMAT_WARNING "WARNING: Formatting will erase ALL data on this disk.\nTo format the disk, click OK. To quit, click CANCEL."
+    IDS_FORMAT_COMPLETE "Format Complete."
 
     /* Run File dialog */
     IDS_RUNDLG_ERROR "Unable to display Run File dialog box (internal error)"
@@ -803,7 +819,7 @@ BEGIN
     IDS_RUNDLG_BROWSE_CAPTION "Browse"
     IDS_RUNDLG_BROWSE_FILTER "Executable Files (*.exe)\0*.exe\0All Files (*.*)\0*.*\0"
 
-    /* shell folder path default values */
+    /* Shell folder path default values. See also: dll/win32/userenv/lang */
     IDS_PROGRAMS "Start Menu\\Programs"
     IDS_PERSONAL "My Documents"
     IDS_FAVORITES "Favorites"
@@ -866,6 +882,7 @@ BEGIN
     IDS_CANTEJECTMEDIA "Unable to eject media (Error Code: %lu)."
     IDS_CANTSHOWPROPERTIES "Unable to show properties (Error Code: %lu)."
     IDS_CANTDISCONNECT "Unable to disconnect (Error Code: %lu)."
+    IDS_NONE "(None)"
 
     /* Friendly File Type Names */
     IDS_DIRECTORY "Folder"
@@ -902,6 +919,7 @@ BEGIN
     IDS_EDIT_VERB "Edit"
     IDS_FIND_VERB "Find"
     IDS_PRINT_VERB "Print"
+    IDS_CMD_VERB "Command Prompt here"
 
     IDS_FILE_FOLDER "%u Files, %u Folders"
     IDS_PRINTERS "Printers"

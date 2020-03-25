@@ -12,6 +12,12 @@
 #define MAIN_WINDOW_MIN_WIDTH 250
 #define MAX_MCISTR            256
 
+#ifdef UNICODE
+#define argv __wargv
+#else
+#define argv __argv
+#endif
+
 HINSTANCE hInstance = NULL;
 HWND hTrackBar = NULL;
 HWND hToolBar = NULL;
@@ -1441,7 +1447,7 @@ MainWndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam)
                 case IDM_ABOUT:
                 {
                     HICON mplayIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_MAIN));
-                    ShellAbout(hwnd, szAppTitle, 0, mplayIcon);
+                    ShellAbout(hwnd, szAppTitle, NULL, mplayIcon);
                     DeleteObject(mplayIcon);
                     break;
                 }
@@ -1537,7 +1543,14 @@ _tWinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPTSTR lpCmdLine, INT nCmdShow)
     ShowWindow(hwnd, SW_SHOW);
     UpdateWindow(hwnd);
 
-    OpenMediaFile(hwnd, lpCmdLine, NULL);
+    if (*lpCmdLine == _T('"'))
+    {
+        OpenMediaFile(hwnd, argv[1], NULL);
+    }
+    else
+    {
+        OpenMediaFile(hwnd, lpCmdLine, NULL);
+    }
 
     /* Message Loop */
     while (GetMessage(&msg, NULL, 0, 0))
